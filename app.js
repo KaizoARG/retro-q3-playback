@@ -2788,11 +2788,6 @@ const screens = [
 
   () => {
 
-    const lastAction =
-      state.actions.length > 0
-        ? state.actions[state.actions.length - 1]
-        : null;
-
     const topTopic =
       getDynamicTopics()
         .slice()
@@ -2802,93 +2797,101 @@ const screens = [
             (state.votes[a.key] || 0)
         )[0];
 
+    const mainTopicCards =
+      topTopic ? getGroupedCards(topTopic.key) : [];
+
+    const mainTopicQuestions = state.guidingQuestions || [];
+
     return `
-      <section class="center">
+      <section>
+        <div class="eyebrow">Cierre</div>
 
-        <div class="eyebrow">
-          Cierre
-        </div>
+        <h2>Resumen de la actividad</h2>
 
-        <h2>
-          Nos llevamos esto.
-        </h2>
-
-        <p
-          class="lead"
-          style="margin:auto">
-
-          La retro termina cuando la conversación
-          se transforma en una decisión visible.
-
+        <p class="lead">
+          Este es el resumen de lo que observamos, las preguntas que nos hicimos
+          y las acciones que acordamos para mejorar.
         </p>
 
-
-        <div class="summary">
-
-          <div class="card">
-
-            <div class="badge">
-              TEMA PRINCIPAL
-            </div>
-
-            <h3>
-              ${
-                topTopic
-                  ? topTopic.label
-                  : "Todavía no hay votos"
-              }
-            </h3>
-
-            <p>
-              ${
-                topTopic
-                  ? `${state.votes[topTopic.key] || 0} votos`
-                  : "Votá un tema para definirlo."
-              }
-            </p>
-
-          </div>
-
-
-          <div class="card">
-
-            <div class="badge">
-              PRÓXIMA ACCIÓN
-            </div>
-
-            <h3>
-              ${
-                lastAction
-                  ? escapeHtml(lastAction.text)
-                  : "Todavía no hay acciones"
-              }
-            </h3>
-
-            <p>
-              ${
-                lastAction
-                  ? `${escapeHtml(lastAction.owner)} · ${escapeHtml(lastAction.date)}`
-                  : "Agregá una acción para verla acá."
-              }
-            </p>
-
-          </div>
-
+        <div class="card" style="margin-top:28px">
+          <div class="badge">TEMA PRINCIPAL</div>
+          <h3 style="font-size:24px;margin-top:12px">
+            ${
+              topTopic
+                ? `&quot;${escapeHtml(topTopic.label)}&quot;`
+                : "Todavía no hay un tema principal"
+            }
+          </h3>
+          <p style="margin-top:8px">
+            ${
+              topTopic
+                ? `${state.votes[topTopic.key] || 0} votos`
+                : "No se registraron votos."
+            }
+          </p>
         </div>
 
-
-        <div class="big-number">
-          ✓
+        <div class="card" style="margin-top:18px">
+          <div class="badge">LO QUE APARECIÓ EN LA ACTIVIDAD</div>
+          <p style="margin-top:10px">
+            Estas son las situaciones que dieron origen al tema principal.
+          </p>
+          ${
+            mainTopicCards.length
+              ? `<div style="display:grid;gap:10px;margin-top:18px">
+                  ${mainTopicCards.map(card => `
+                    <div class="sticky">${escapeHtml(card.contenido)}</div>
+                  `).join("")}
+                </div>`
+              : `<div class="badge" style="margin-top:16px">No hay tarjetas vinculadas al tema principal.</div>`
+          }
         </div>
 
-        <p class="badge">
-          Retro finalizada · Q3 2026
-        </p>
+        <div class="card" style="margin-top:18px">
+          <div class="badge">PREGUNTAS QUE NOS HICIMOS</div>
+          <p style="margin-top:10px">
+            Preguntas que usamos para profundizar en el tema y abrir posibilidades de mejora.
+          </p>
+          ${
+            mainTopicQuestions.length
+              ? `<div style="display:grid;gap:10px;margin-top:18px">
+                  ${mainTopicQuestions.map((question, index) => `
+                    <div style="display:flex;gap:12px;align-items:flex-start;padding:14px 16px;border:1px solid rgba(255,255,255,.10);border-radius:12px">
+                      <strong>${index + 1}.</strong>
+                      <span>${escapeHtml(question.text)}</span>
+                    </div>
+                  `).join("")}
+                </div>`
+              : `<div class="badge" style="margin-top:16px">No se registraron preguntas guía.</div>`
+          }
+        </div>
 
+        <div class="card" style="margin-top:18px">
+          <div class="badge">ACCIONES ACORDADAS</div>
+          <p style="margin-top:10px">
+            Las decisiones que surgieron para transformar lo conversado en mejoras concretas.
+          </p>
+          ${
+            state.actions.length
+              ? `<div style="display:grid;gap:12px;margin-top:18px">
+                  ${state.actions.map(action => `
+                    <div style="padding:14px 16px;border:1px solid rgba(255,255,255,.10);border-radius:12px">
+                      <strong>${escapeHtml(action.text)}</strong>
+                      <div class="badge" style="margin-top:6px">
+                        ${escapeHtml(action.owner)} · ${escapeHtml(action.date)}
+                      </div>
+                    </div>
+                  `).join("")}
+                </div>`
+              : `<div class="badge" style="margin-top:16px">Todavía no hay acciones acordadas.</div>`
+          }
+        </div>
+
+        <div class="big-number" style="margin-top:28px">✓</div>
+        <p class="badge">Actividad finalizada · Q3 2026</p>
       </section>
     `;
   }
-
 ];
 
 

@@ -881,16 +881,19 @@ if (addCard) {
       return;
     }
 
-    const { data, error } =
-      await supabaseClient
-        .from("cards")
-        .insert({
-	    contenido: text,
-	    etapa: type,
-	    retro_id: state.retroId
-	})
-        .select()
-        .single();
+	const { data, error } =
+	  await supabaseClient
+		.from("acciones")
+		.insert({
+
+		  descripcion: t,
+		  responsable: owner,
+		  fecha: date,
+		  retro_id: state.retroId
+
+		})
+		.select()
+		.single();
 
     if (error) {
 

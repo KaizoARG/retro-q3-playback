@@ -73,6 +73,8 @@ const state = {
   retroStarted: false,
   retroStartedAt: null,
   retroFinishedAt: null,
+  feedbackSubmitted: false,
+  feedbackLoaded: false,
   participants: []
 };
 
@@ -1877,6 +1879,124 @@ function facilitatorModal() {
 
 
 // =====================================================
+// FEEDBACK FINAL
+// =====================================================
+
+async function loadMyFeedback() {
+  if (!state.retroId || !state.participantSessionId) return;
+
+  const { data, error } = await supabaseClient
+    .from("retro_feedback")
+    .select("id, rating, observaciones, feedback_herramienta")
+    .eq("retro_id", state.retroId)
+    .eq("session_id", state.participantSessionId)
+    .maybeSingle();
+
+  if (error) {
+    console.error("Error cargando feedback:", error);
+    return;
+  }
+
+  state.feedbackLoaded = true;
+  state.feedbackSubmitted = Boolean(data);
+  state.myFeedback = data || null;
+}
+
+async function submitFeedback() {
+  const ratingEl = document.querySelector("#feedbackRating");
+  const observationsEl = document.querySelector("#feedbackObservations");
+  const toolFeedbackEl = document.querySelector("#feedbackTool");
+  const submitBtn = document.querySelector("#submitFeedbackBtn");
+
+  const rating = Number(ratingEl?.value || 0);
+  const observations = String(observationsEl?.value || "").trim();
+  const toolFeedback = String(toolFeedbackEl?.value || "").trim();
+
+  if (!rating || rating < 1 || rating > 10) {
+    alert("Por favor calificá el encuentro del 1 al 10.");
+    return;
+  }
+
+  if (!observations) {
+    alert("Las observaciones sobre el encuentro son obligatorias.");
+    observationsEl?.focus();
+    return;
+  }
+
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Guardando…";
+  }
+
+  const { data, error } = await supabaseClient.rpc("submit_retro_feedback", {
+    p_retro_id: state.retroId,
+    p_session_id: state.participantSessionId,
+    p_rating: rating,
+    p_observaciones: observations,
+    p_feedback_herramienta: toolFeedback || null
+  });
+
+  if (error) {
+    console.error("Error guardando feedback:", error);
+    alert("No se pudo guardar el feedback.\n\n" + error.message);
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Enviar feedback";
+    }
+    return;
+  }
+
+  state.feedbackSubmitted = true;
+  state.myFeedback = data;
+  render();
+}
+
+function feedbackLanding() {
+  const feedback = state.myFeedback || {};
+
+  if (state.feedbackSubmitted) {
+    return `
+      <section style="max-width:720px;margin:0 auto;text-align:center;padding:52px 20px">
+        <div class="big-number" style="margin-bottom:16px">✓</div>
+        <div class="eyebrow">Feedback enviado</div>
+        <h2 style="margin-top:10px">Gracias por compartir tu mirada</h2>
+        <p class="lead" style="margin-top:14px">
+          Tu feedback nos ayuda a mejorar tanto el espacio como la herramienta.
+        </p>
+      </section>
+    `;
+  }
+
+  return `
+    <section style="max-width:760px;margin:0 auto;padding:42px 20px">
+      <div class="eyebrow">Retro finalizada</div>
+      <h2 style="margin-top:10px">¿Cómo fue el encuentro?</h2>
+      <p class="lead" style="margin-top:12px">
+        Queremos conocer tu experiencia para seguir mejorando estos espacios.
+      </p>
+
+      <div class="card" style="margin-top:28px">
+        <label class="badge" for="feedbackRating">CALIFICÁ EL ENCUENTRO · 1 A 10</label>
+        <select id="feedbackRating" style="width:100%;margin-top:10px;padding:12px;border-radius:10px;background:#111;color:inherit;border:1px solid rgba(255,255,255,.18)">
+          <option value="">Seleccioná una calificación</option>
+          ${Array.from({length:10}, (_,i) => {
+            const n=i+1; return `<option value="${n}" ${Number(feedback.rating)===n?'selected':''}>${n}</option>`;
+          }).join("")}
+        </select>
+
+        <label class="badge" for="feedbackObservations" style="display:block;margin-top:24px">OBSERVACIONES · OBLIGATORIO</label>
+        <textarea id="feedbackObservations" rows="6" placeholder="Dejanos tus observaciones sobre el encuentro…" style="width:100%;margin-top:10px;resize:vertical">${escapeHtml(feedback.observaciones || "")}</textarea>
+
+        <label class="badge" for="feedbackTool" style="display:block;margin-top:24px">FEEDBACK SOBRE LA HERRAMIENTA</label>
+        <textarea id="feedbackTool" rows="4" placeholder="¿Qué mejorarías de la herramienta? ¿Qué funcionalidad nueva agregarías?" style="width:100%;margin-top:10px;resize:vertical">${escapeHtml(feedback.feedback_herramienta || "")}</textarea>
+
+        <button id="submitFeedbackBtn" class="primary" style="margin-top:24px;width:100%;padding:13px 18px">Enviar feedback</button>
+      </div>
+    </section>
+  `;
+}
+
+// =====================================================
 // RENDER PRINCIPAL
 // =====================================================
 
@@ -1906,6 +2026,19 @@ function render() {
     return;
   }
 
+  if (state.retroFinishedAt && state.step === steps.length - 1) {
+    stepLabel.textContent = "Feedback";
+    progressBar.style.width = "100%";
+    backBtn.style.visibility = "hidden";
+    backBtn.disabled = true;
+    nextBtn.style.display = "none";
+    app.innerHTML = feedbackLanding();
+    const submitFeedbackBtn = document.querySelector("#submitFeedbackBtn");
+    if (submitFeedbackBtn) submitFeedbackBtn.onclick = submitFeedback;
+    return;
+  }
+
+  nextBtn.style.display = "";
 
   if (!state.retroStarted) {
     stepLabel.textContent = "Preparación";
@@ -1965,7 +2098,7 @@ function render() {
   } else if (state.step === steps.length - 1) {
 
     nextBtn.textContent = "Retro finalizada ✓";
-    nextBtn.disabled = true;
+    nextBtn.disabled = !state.isFacilitator;
 
   } else if (!state.isFacilitator) {
 
@@ -3249,6 +3382,8 @@ function subscribeToRetro() {
 
         state.retroStarted =
           Boolean(payload.new.iniciada);
+        state.retroStartedAt = payload.new.iniciada_en || state.retroStartedAt;
+        state.retroFinishedAt = payload.new.finalizada_en || state.retroFinishedAt;
 
         updateFacilitatorState();
 
@@ -5146,6 +5281,20 @@ document
       state.step >=
       steps.length - 1
     ) {
+      const { data, error } = await supabaseClient.rpc("mark_retro_finished", {
+        p_retro_id: state.retroId,
+        p_session_id: state.participantSessionId
+      });
+
+      if (error) {
+        console.error("Error finalizando retro:", error);
+        alert("No se pudo finalizar la retro.\n\n" + error.message);
+        return;
+      }
+
+      state.retroFinishedAt = data?.finalizada_en || new Date().toISOString();
+      await loadMyFeedback();
+      render();
       return;
     }
 
@@ -5247,6 +5396,10 @@ async function initialize() {
   await loadMyVotes();
 
   await loadParticipants();
+
+  if (state.retroFinishedAt) {
+    await loadMyFeedback();
+  }
 
 
   // ---------------------------------------------------

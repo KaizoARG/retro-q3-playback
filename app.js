@@ -2037,9 +2037,8 @@ function render() {
   if (state.retroFinishedAt && state.step === steps.length - 1 && state.showFeedback) {
     stepLabel.textContent = "Feedback";
     progressBar.style.width = "100%";
-    backBtn.style.visibility = "visible";
-    backBtn.disabled = false;
-    backBtn.textContent = "← Volver al cierre";
+    backBtn.style.visibility = "hidden";
+    backBtn.disabled = true;
     nextBtn.style.display = "none";
     app.innerHTML = feedbackLanding();
 

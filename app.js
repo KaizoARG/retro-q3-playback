@@ -2912,6 +2912,32 @@ const screens = [
         Evitemos acciones genéricas.
       </p>
 
+      <div class="card" style="margin-top:24px">
+        <div class="badge">PREGUNTAS GUÍA</div>
+        <p style="margin-top:10px">
+          Estas son las preguntas que nos hicimos en la instancia anterior.
+          Usémoslas como punto de partida para definir acciones de mejora.
+        </p>
+
+        ${
+          state.guidingQuestions && state.guidingQuestions.length
+            ? `
+              <div style="display:grid;gap:10px;margin-top:18px">
+                ${state.guidingQuestions.map((question, index) => `
+                  <div class="topic" style="display:flex;align-items:flex-start;gap:12px">
+                    <strong>${index + 1}.</strong>
+                    <span>${escapeHtml(question.text)}</span>
+                  </div>
+                `).join("")}
+              </div>
+            `
+            : `
+              <div class="badge" style="margin-top:16px">
+                No se registraron preguntas guía en la instancia anterior.
+              </div>
+            `
+        }
+      </div>
 
       <div class="action-form">
 

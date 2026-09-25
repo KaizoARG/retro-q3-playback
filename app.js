@@ -2275,15 +2275,15 @@ const screens = [
           <select id="cardType">
 
             <option value="green">
-              Funcionó
+              ¿Qué salió bien?
             </option>
 
             <option value="red">
-              Nos trabó
+              ¿Qué nos dolió?
             </option>
 
             <option value="blue">
-              Aprendimos
+              Ideas / Sugerencias
             </option>
 
           </select>
@@ -2314,9 +2314,21 @@ const screens = [
         style="margin-top:20px">
 
         ${[
-          { key: "green", label: "Funcionó" },
-          { key: "red", label: "Nos trabó" },
-          { key: "blue", label: "Aprendimos" }
+          {
+            key: "green",
+            label: "¿Qué salió bien?",
+            description: "Prácticas que conviene mantener."
+          },
+          {
+            key: "red",
+            label: "¿Qué nos dolió?",
+            description: "Problemas o bloqueos sufridos."
+          },
+          {
+            key: "blue",
+            label: "Ideas / Sugerencias",
+            description: "Ideas o propuestas de mejora para el siguiente ciclo."
+          }
         ].map(column => {
           const columnCards = state.cards.filter(card => card.etapa === column.key);
           return `
@@ -2326,8 +2338,13 @@ const screens = [
               style="min-height:180px">
 
               <div class="column-title">
-                ${column.label}
-                <small>· ${columnCards.length}</small>
+                <div>
+                  ${column.label}
+                  <small>· ${columnCards.length}</small>
+                </div>
+                <div style="font-size:13px;font-weight:400;line-height:1.4;opacity:.7;margin-top:6px">
+                  ${column.description}
+                </div>
               </div>
 
               <div class="activity-drop-zone" data-etapa="${column.key}" style="min-height:120px">
@@ -2576,10 +2593,10 @@ const screens = [
                     <div class="badge" style="margin-bottom:10px">
                       ${
                         card.etapa === "green"
-                          ? "Funcionó"
+                          ? "¿Qué salió bien?"
                           : card.etapa === "red"
-                            ? "Nos trabó"
-                            : "Aprendimos"
+                            ? "¿Qué nos dolió?"
+                            : "Ideas / Sugerencias"
                       }
                     </div>
                     <strong>${escapeHtml(card.contenido)}</strong>
@@ -2984,11 +3001,11 @@ const screens = [
     const formatDuration = (start, end) => {
       if (!start || !end) return "Tiempo total no disponible todavía";
       const ms = Math.max(0, new Date(end).getTime() - new Date(start).getTime());
-      const totalMinutes = Math.floor(ms / 60000);
-      const hours = Math.floor(totalMinutes / 60);
-      const minutes = totalMinutes % 60;
-      if (hours > 0) return `${hours} h ${minutes} min`;
-      return `${minutes} min`;
+      const totalSeconds = Math.floor(ms / 1000);
+      const hours = Math.floor(totalSeconds / 3600);
+      const minutes = Math.floor((totalSeconds % 3600) / 60);
+      const seconds = totalSeconds % 60;
+      return `${hours} h ${minutes} min ${seconds} s`;
     };
 
     return `
@@ -3047,7 +3064,7 @@ const screens = [
                 ${mainTopicCards.map(card => `
                   <div class="topic" style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
                     <div>
-                      <div class="badge">${card.etapa === "green" ? "Funcionó" : card.etapa === "red" ? "Nos trabó" : "Aprendimos"}</div>
+                      <div class="badge">${card.etapa === "green" ? "¿Qué salió bien?" : card.etapa === "red" ? "¿Qué nos dolió?" : "Ideas / Sugerencias"}</div>
                       <div style="margin-top:6px">${escapeHtml(card.contenido)}</div>
                     </div>
                     ${state.isFacilitator ? `<div style="display:flex;gap:6px;flex-shrink:0">
@@ -3842,8 +3859,9 @@ async function bind() {
       const text = prompt("Texto de la nueva tarjeta:");
       const clean = String(text || "").trim();
       if (!clean) return;
-      const type = prompt("Tipo de tarjeta: funcionó / nos trabó / aprendimos", "nos trabó") || "nos trabó";
-      const etapa = normalizeTopicText(type).includes("func") ? "green" : normalizeTopicText(type).includes("aprend") ? "blue" : "red";
+      const type = prompt("Tipo de tarjeta: ¿qué salió bien? / ¿qué nos dolió? / ideas / sugerencias", "¿qué nos dolió?") || "¿qué nos dolió?";
+      const normalizedType = normalizeTopicText(type);
+      const etapa = normalizedType.includes("sal") || normalizedType.includes("func") ? "green" : normalizedType.includes("idea") || normalizedType.includes("suger") || normalizedType.includes("aprend") ? "blue" : "red";
       const topTopic = getTopVotedTopic();
       const { data, error } = await supabaseClient.rpc("create_summary_card", {
         p_retro_id: state.retroId, p_session_id: state.participantSessionId,

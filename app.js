@@ -2094,7 +2094,7 @@ const screens = [
 
 
   // ===================================================
-  // 3. COSECHA
+  // 3. ACTIVIDAD
   // ===================================================
 
   () => `
@@ -2110,7 +2110,9 @@ const screens = [
 
       <p class="lead">
         Compartí algo que funcionó, algo que nos trabó
-        o algo que aprendimos.
+        o algo que aprendimos. Las tarjetas se pueden mover
+        entre columnas y editar para construir una actividad
+        que represente al equipo.
       </p>
 
       <div
@@ -2152,96 +2154,84 @@ const screens = [
 
       </div>
 
+      <p class="badge" style="margin-top:18px">
+        Podés arrastrar una tarjeta para moverla de una columna a otra.
+      </p>
 
       <div
         class="columns"
-        style="margin-top:30px">
+        style="margin-top:20px">
 
-        <div class="column">
+        ${[
+          { key: "green", label: "Funcionó" },
+          { key: "red", label: "Nos trabó" },
+          { key: "blue", label: "Aprendimos" }
+        ].map(column => {
+          const columnCards = state.cards.filter(card => card.etapa === column.key);
+          return `
+            <div
+              class="column activity-column"
+              data-etapa="${column.key}"
+              style="min-height:180px">
 
-          <div class="column-title">
-            Funcionó
-            <small>
-              · ${
-                state.cards.filter(
-                  card => card.etapa === "green"
-                ).length
-              }
-            </small>
-          </div>
+              <div class="column-title">
+                ${column.label}
+                <small>· ${columnCards.length}</small>
+              </div>
 
-          ${
-            state.cards
-              .filter(card => card.etapa === "green")
-              .map(card => `
-                <div class="sticky">
-                  ${escapeHtml(card.contenido)}
-                </div>
-              `)
-              .join("")
-          }
+              <div class="activity-drop-zone" data-etapa="${column.key}" style="min-height:120px">
+                ${columnCards.length
+                  ? columnCards.map(card => `
+                    <div
+                      class="sticky activity-card"
+                      draggable="true"
+                      data-card-id="${escapeHtml(card.id)}"
+                      style="position:relative;cursor:grab;padding-right:76px;"
+                      title="Arrastrá para mover la tarjeta">
 
-        </div>
+                      <div>${escapeHtml(card.contenido)}</div>
 
-
-        <div class="column">
-
-          <div class="column-title">
-            Nos trabó
-            <small>
-              · ${
-                state.cards.filter(
-                  card => card.etapa === "red"
-                ).length
-              }
-            </small>
-          </div>
-
-          ${
-            state.cards
-              .filter(card => card.etapa === "red")
-              .map(card => `
-                <div class="sticky">
-                  ${escapeHtml(card.contenido)}
-                </div>
-              `)
-              .join("")
-          }
-
-        </div>
-
-
-        <div class="column">
-
-          <div class="column-title">
-            Aprendimos
-            <small>
-              · ${
-                state.cards.filter(
-                  card => card.etapa === "blue"
-                ).length
-              }
-            </small>
-          </div>
-
-          ${
-            state.cards
-              .filter(card => card.etapa === "blue")
-              .map(card => `
-                <div class="sticky">
-                  ${escapeHtml(card.contenido)}
-                </div>
-              `)
-              .join("")
-          }
-
-        </div>
+                      <div
+                        style="
+                          position:absolute;
+                          right:8px;
+                          top:8px;
+                          display:flex;
+                          gap:5px;
+                        ">
+                        <button
+                          type="button"
+                          class="activity-edit-card"
+                          data-card-id="${escapeHtml(card.id)}"
+                          draggable="false"
+                          title="Modificar tarjeta"
+                          aria-label="Modificar tarjeta"
+                          style="width:30px;height:30px;border-radius:8px;border:1px solid rgba(0,0,0,.15);background:rgba(255,255,255,.7);cursor:pointer;">
+                          ✏️
+                        </button>
+                        <button
+                          type="button"
+                          class="activity-delete-card"
+                          data-card-id="${escapeHtml(card.id)}"
+                          draggable="false"
+                          title="Eliminar tarjeta"
+                          aria-label="Eliminar tarjeta"
+                          style="width:30px;height:30px;border-radius:8px;border:1px solid rgba(0,0,0,.15);background:rgba(255,255,255,.7);cursor:pointer;">
+                          🗑️
+                        </button>
+                      </div>
+                    </div>
+                  `).join("")
+                  : `<div class="badge activity-empty" style="padding:20px 8px;text-align:center">Arrastrá tarjetas acá</div>`}
+              </div>
+            </div>
+          `;
+        }).join("")}
 
       </div>
 
     </section>
   `,
-
 
   // ===================================================
   // 4. AGRUPACIÓN
@@ -4488,7 +4478,7 @@ async function bind() {
 
 
   // ===================================================
-  // COSECHA - AGREGAR TARJETA
+  // ACTIVIDAD - AGREGAR TARJETA
   // ===================================================
 
   const addCard =
@@ -4584,6 +4574,189 @@ async function bind() {
 
   }
 
+
+  // ===================================================
+  // ACTIVIDAD - EDITAR / ELIMINAR / DRAG & DROP
+  // ===================================================
+
+  document
+    .querySelectorAll(".activity-edit-card")
+    .forEach(button => {
+      button.onclick = async event => {
+        event.preventDefault();
+        event.stopPropagation();
+
+        const cardId = button.dataset.cardId;
+        const card = state.cards.find(item => item.id === cardId);
+        if (!card) return;
+
+        const updatedText = prompt("Modificar tarjeta:", card.contenido);
+        if (updatedText === null) return;
+
+        const cleanText = updatedText.trim();
+        if (!cleanText) {
+          alert("La tarjeta no puede quedar vacía.");
+          return;
+        }
+
+        try {
+          const { data, error } = await supabaseClient.rpc(
+            "update_activity_card",
+            {
+              p_retro_id: state.retroId,
+              p_session_id: state.participantSessionId,
+              p_card_id: cardId,
+              p_contenido: cleanText,
+              p_etapa: card.etapa
+            }
+          );
+
+          if (error) throw error;
+          if (!data?.success) {
+            throw new Error(data?.message || "No se pudo modificar la tarjeta.");
+          }
+
+          const index = state.cards.findIndex(item => item.id === cardId);
+          if (index !== -1) {
+            state.cards[index] = {
+              ...state.cards[index],
+              contenido: cleanText
+            };
+          }
+
+          render();
+        } catch (error) {
+          console.error("Error modificando tarjeta:", error);
+          alert("No se pudo modificar la tarjeta.\n\n" + error.message);
+        }
+      };
+    });
+
+  document
+    .querySelectorAll(".activity-delete-card")
+    .forEach(button => {
+      button.onclick = async event => {
+        event.preventDefault();
+        event.stopPropagation();
+
+        const cardId = button.dataset.cardId;
+        const card = state.cards.find(item => item.id === cardId);
+        if (!card) return;
+
+        const confirmed = confirm(
+          `¿Eliminar esta tarjeta?\n\n"${card.contenido}"`
+        );
+        if (!confirmed) return;
+
+        try {
+          const { data, error } = await supabaseClient.rpc(
+            "delete_activity_card",
+            {
+              p_retro_id: state.retroId,
+              p_session_id: state.participantSessionId,
+              p_card_id: cardId
+            }
+          );
+
+          if (error) throw error;
+          if (!data?.success) {
+            throw new Error(data?.message || "No se pudo eliminar la tarjeta.");
+          }
+
+          state.cards = state.cards.filter(item => item.id !== cardId);
+          render();
+        } catch (error) {
+          console.error("Error eliminando tarjeta:", error);
+          alert("No se pudo eliminar la tarjeta.\n\n" + error.message);
+        }
+      };
+    });
+
+  document
+    .querySelectorAll(".activity-card")
+    .forEach(cardElement => {
+      cardElement.addEventListener("dragstart", event => {
+        const cardId = cardElement.dataset.cardId;
+        event.dataTransfer.effectAllowed = "move";
+        event.dataTransfer.setData("text/plain", cardId);
+        cardElement.style.opacity = "0.45";
+      });
+
+      cardElement.addEventListener("dragend", () => {
+        cardElement.style.opacity = "1";
+        document
+          .querySelectorAll(".activity-drop-zone")
+          .forEach(zone => {
+            zone.classList.remove("activity-drag-over");
+            zone.style.background = "";
+            zone.style.outline = "";
+          });
+      });
+    });
+
+  document
+    .querySelectorAll(".activity-drop-zone")
+    .forEach(zone => {
+      zone.addEventListener("dragover", event => {
+        event.preventDefault();
+        event.dataTransfer.dropEffect = "move";
+        zone.classList.add("activity-drag-over");
+        zone.style.background = "rgba(255,255,255,.04)";
+        zone.style.outline = "2px dashed rgba(255,255,255,.22)";
+      });
+
+      zone.addEventListener("dragleave", event => {
+        if (!zone.contains(event.relatedTarget)) {
+          zone.classList.remove("activity-drag-over");
+          zone.style.background = "";
+          zone.style.outline = "";
+        }
+      });
+
+      zone.addEventListener("drop", async event => {
+        event.preventDefault();
+        zone.classList.remove("activity-drag-over");
+        zone.style.background = "";
+        zone.style.outline = "";
+
+        const cardId = event.dataTransfer.getData("text/plain");
+        const newEtapa = zone.dataset.etapa;
+        const card = state.cards.find(item => item.id === cardId);
+
+        if (!card || !newEtapa || card.etapa === newEtapa) return;
+
+        try {
+          const { data, error } = await supabaseClient.rpc(
+            "update_activity_card",
+            {
+              p_retro_id: state.retroId,
+              p_session_id: state.participantSessionId,
+              p_card_id: cardId,
+              p_contenido: card.contenido,
+              p_etapa: newEtapa
+            }
+          );
+
+          if (error) throw error;
+          if (!data?.success) {
+            throw new Error(data?.message || "No se pudo mover la tarjeta.");
+          }
+
+          const index = state.cards.findIndex(item => item.id === cardId);
+          if (index !== -1) {
+            state.cards[index] = {
+              ...state.cards[index],
+              etapa: newEtapa
+            };
+          }
+
+          render();
+        } catch (error) {
+          console.error("Error moviendo tarjeta:", error);
+          alert("No se pudo mover la tarjeta.\n\n" + error.message);
+        }
+      });
+    });
 
   // ===================================================
   // PREGUNTAS GUÍA

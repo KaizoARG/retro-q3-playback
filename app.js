@@ -56,6 +56,9 @@ const state = {
   // Retro actual
   retroId: null,
 
+  // Preguntas guía de la conversación
+  guidingQuestions: [],
+
   // Acciones
   actions: [],
 
@@ -146,6 +149,68 @@ function titleCaseTopic(label) {
     .join(" ");
 }
 
+
+
+function getTopVotedTopic() {
+  return getDynamicTopics()
+    .slice()
+    .sort((a, b) =>
+      (state.votes[b.key] || 0) -
+      (state.votes[a.key] || 0) ||
+      (b.count || 0) - (a.count || 0) ||
+      a.label.localeCompare(b.label)
+    )[0] || null;
+}
+
+function getQuestionFocusWords(cards, topicLabel) {
+  const topicTokens = new Set(getMeaningfulTokens(topicLabel));
+  const counts = new Map();
+
+  cards.forEach(card => {
+    const unique = new Set(getMeaningfulTokens(card.contenido));
+    unique.forEach(token => {
+      if (topicTokens.has(token)) return;
+      counts.set(token, (counts.get(token) || 0) + 1);
+    });
+  });
+
+  return Array.from(counts.entries())
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, 2)
+    .map(([token]) => titleCaseTopic(token));
+}
+
+function buildGuidingQuestionSuggestions(topic, cards) {
+  if (!topic) return [];
+
+  const label = topic.label;
+  const focusWords = getQuestionFocusWords(cards, label);
+  const focus = focusWords.length
+    ? `, especialmente alrededor de ${focusWords.join(" y ")}`
+    : "";
+
+  const redCount = cards.filter(card => card.etapa === "red").length;
+  const blueCount = cards.filter(card => card.etapa === "blue").length;
+
+  const suggestions = [
+    `¿Qué patrón común hay detrás de las situaciones vinculadas a ${label}${focus}?`,
+    redCount > 0
+      ? `¿Qué condición de nuestro sistema de trabajo está generando o sosteniendo los problemas asociados a ${label}?`
+      : `¿Qué parte de nuestra forma de trabajar podríamos cambiar para mejorar lo que aparece alrededor de ${label}?`,
+    blueCount > 0
+      ? `¿Qué aprendimos de estas situaciones que deberíamos incorporar a nuestra forma de trabajar para que ${label} evolucione?`
+      : `¿Qué información, decisión o coordinación nos está faltando para abordar mejor ${label}?`
+  ];
+
+  return Array.from(new Set(suggestions)).slice(0, 3);
+}
+
+function questionExists(text) {
+  const normalized = normalizeTopicText(text);
+  return state.guidingQuestions.some(question =>
+    normalizeTopicText(question.text) === normalized
+  );
+}
 
 function getDynamicTopics() {
   const grouped = new Map();
@@ -394,7 +459,7 @@ const steps = [
   "Actividad",
   "Agrupación",
   "Votación",
-  "Conversación",
+  "Preguntas guía",
   "Acciones",
   "Cierre"
 ];
@@ -1074,6 +1139,7 @@ async function resetRetro() {
   state.myVotes = {};
   state.usedVotes = 0;
   state.cards = [];
+  state.guidingQuestions = [];
   state.actions = [];
   state.facilitatorSessionId = null;
   state.facilitatorName = null;
@@ -2483,118 +2549,143 @@ const screens = [
 
 
   // ===================================================
-  // 6. CONVERSACIÓN
+  // 6. PREGUNTAS GUÍA
   // ===================================================
 
   () => {
 
-    const topTopic =
-      getDynamicTopics()
-        .slice()
-        .sort(
-          (a, b) =>
-            (state.votes[b.key] || 0) -
-            (state.votes[a.key] || 0)
-        )[0];
-
-    const topTopicVotes =
-      topTopic
-        ? state.votes[topTopic.key] || 0
-        : 0;
-
-    const topicCards =
-      topTopic
-        ? getGroupedCards(topTopic.key)
-        : [];
+    const topTopic = getTopVotedTopic();
+    const topicCards = topTopic ? getGroupedCards(topTopic.key) : [];
+    const questions = state.guidingQuestions || [];
+    const isFacilitator = state.isFacilitator;
 
     return `
       <section>
 
         <div class="eyebrow">
-          Conversación
+          Preguntas guía
         </div>
 
         <h2>
-          ${
-            topTopic
-              ? topTopic.label
-              : "Tema principal"
-          }
+          ${topTopic ? escapeHtml(topTopic.label) : "Tema priorizado"}
         </h2>
 
         <p class="lead">
-
-          Este tema recibió
-          ${topTopicVotes}
-          voto${topTopicVotes === 1 ? "" : "s"}.
-
-          La pregunta ahora no es solamente qué pasó,
-          sino qué hay detrás.
-
+          Este es el tema que recibió más votos.
+          Ahora el objetivo es hacernos preguntas que nos ayuden a entender
+          qué hay detrás y abrir el camino hacia acciones de mejora.
         </p>
 
-
         ${
-          topicCards.length > 0
+          topicCards.length
             ? `
-              <div
-                class="card"
-                style="margin-top:30px">
-
-                <h3>
-                  Lo que apareció en la actividad
-                </h3>
-
-                <div
-                  style="
-                    display:grid;
-                    gap:10px;
-                    margin-top:20px;
-                  ">
-
-                  ${topicCards
-                    .map(card => `
-                      <div class="sticky">
-                        ${escapeHtml(card.contenido)}
-                      </div>
-                    `)
-                    .join("")}
-
+              <div class="card" style="margin-top:28px">
+                <h3>Lo que apareció en la actividad</h3>
+                <div style="display:grid;gap:10px;margin-top:18px">
+                  ${topicCards.map(card => `
+                    <div class="sticky">
+                      ${escapeHtml(card.contenido)}
+                    </div>
+                  `).join("")}
                 </div>
-
               </div>
             `
-            : ""
+            : `
+              <div class="card" style="margin-top:28px">
+                <p>No hay tarjetas asignadas a este tema en común.</p>
+              </div>
+            `
         }
 
+        ${
+          isFacilitator
+            ? `
+              <div class="card" style="margin-top:28px">
+                <h3>Propuestas de preguntas</h3>
+                <p>
+                  El sistema puede proponer preguntas a partir del tema priorizado
+                  y de las situaciones que aparecieron en la actividad.
+                </p>
+                <button
+                  class="primary"
+                  id="generateQuestionsBtn"
+                  style="margin-top:12px">
+                  Generar preguntas guía
+                </button>
+              </div>
+            `
+            : `
+              <div class="card" style="margin-top:28px">
+                <p>
+                  El facilitador puede generar algunas preguntas de partida.
+                  Después, todos pueden sumar las que consideren necesarias.
+                </p>
+              </div>
+            `
+        }
 
-        <div
-          class="card"
-          style="margin-top:34px">
-
-          <h3>
-            Preguntas guía
-          </h3>
-
+        <div class="card" style="margin-top:28px">
+          <h3>Preguntas del equipo</h3>
           <p>
-
-            ¿Dónde aparece la dependencia?
-
-            <br><br>
-
-            ¿Qué información llega tarde?
-
-            <br><br>
-
-            ¿Qué decisión podría tomarse antes?
-
-            <br><br>
-
-            ¿Qué necesitamos cambiar
-            en nuestro sistema de trabajo?
-
+            No buscamos responderlas ahora. Buscamos preguntas que nos ayuden
+            a descubrir dónde podemos intervenir para mejorar.
           </p>
 
+          <div style="display:grid;gap:12px;margin-top:18px">
+            ${
+              questions.length
+                ? questions.map((question, index) => `
+                    <div
+                      class="topic"
+                      style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;">
+                      <div style="display:flex;gap:12px;min-width:0;">
+                        <strong>${index + 1}.</strong>
+                        <span>${escapeHtml(question.text)}</span>
+                      </div>
+                      ${
+                        isFacilitator
+                          ? `
+                            <button
+                              type="button"
+                              class="delete-guiding-question"
+                              data-question-id="${escapeHtml(question.id)}"
+                              title="Eliminar pregunta"
+                              aria-label="Eliminar pregunta"
+                              style="
+                                flex-shrink:0;
+                                width:34px;
+                                height:34px;
+                                border-radius:9px;
+                                cursor:pointer;
+                                background:transparent;
+                                border:1px solid rgba(255,255,255,.14);
+                                color:inherit;
+                              ">🗑️</button>
+                          `
+                          : ""
+                      }
+                    </div>
+                  `).join("")
+                : `
+                    <div class="badge">
+                      Todavía no hay preguntas. Generá algunas o agregá una del equipo.
+                    </div>
+                  `
+            }
+          </div>
+
+          <div style="display:grid;gap:10px;margin-top:22px">
+            <textarea
+              id="guidingQuestionText"
+              rows="3"
+              placeholder="¿Qué pregunta nos ayudaría a entender mejor qué podemos mejorar?"
+              style="width:100%;resize:vertical;"></textarea>
+            <button
+              class="primary"
+              id="addGuidingQuestionBtn">
+              + Agregar pregunta
+            </button>
+          </div>
         </div>
 
       </section>
@@ -2910,6 +3001,38 @@ async function loadTopics() {
   state.topics = data || [];
 
   console.log("Temas en común cargados:", state.topics);
+}
+
+
+// =====================================================
+// CARGAR PREGUNTAS GUÍA
+// =====================================================
+
+async function loadGuidingQuestions() {
+
+  const { data, error } = await supabaseClient
+    .from("preguntas_guia")
+    .select("id, retro_id, topic_key, pregunta, origen, autor_session_id, orden, created_at")
+    .eq("retro_id", state.retroId)
+    .order("orden", { ascending: true })
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    console.error("Error cargando preguntas guía:", error);
+    state.guidingQuestions = [];
+    return;
+  }
+
+  state.guidingQuestions = (data || []).map(question => ({
+    id: question.id,
+    topicKey: question.topic_key,
+    text: question.pregunta,
+    origin: question.origen,
+    authorSessionId: question.autor_session_id,
+    order: question.orden
+  }));
+
+  console.log("Preguntas guía cargadas:", state.guidingQuestions);
 }
 
 
@@ -3307,6 +3430,37 @@ function subscribeToVotes() {
         status
       );
 
+    });
+}
+
+
+// =====================================================
+// REALTIME - PREGUNTAS GUÍA
+// =====================================================
+
+function subscribeToGuidingQuestions() {
+
+  supabaseClient
+    .channel("guiding-questions-realtime-" + state.retroId)
+    .on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "preguntas_guia",
+        filter: `retro_id=eq.${state.retroId}`
+      },
+      async payload => {
+        console.log("Cambio de preguntas guía recibido:", payload);
+        await loadGuidingQuestions();
+
+        if (state.step === 5 || state.step === 6 || state.step === 7) {
+          render();
+        }
+      }
+    )
+    .subscribe(status => {
+      console.log("Realtime preguntas guía:", status);
     });
 }
 
@@ -4125,6 +4279,162 @@ async function bind() {
 
 
   // ===================================================
+  // PREGUNTAS GUÍA
+  // ===================================================
+
+  const generateQuestionsBtn =
+    document.querySelector("#generateQuestionsBtn");
+
+  if (generateQuestionsBtn) {
+    generateQuestionsBtn.onclick = async () => {
+      if (!state.isFacilitator) {
+        alert("Solo el facilitador puede generar las preguntas guía.");
+        return;
+      }
+
+      const topTopic = getTopVotedTopic();
+      const topicCards = topTopic ? getGroupedCards(topTopic.key) : [];
+
+      if (!topTopic) {
+        alert("Todavía no hay un tema en común priorizado.");
+        return;
+      }
+
+      const suggestions = buildGuidingQuestionSuggestions(topTopic, topicCards);
+      generateQuestionsBtn.disabled = true;
+      generateQuestionsBtn.textContent = "Generando…";
+
+      try {
+        let added = 0;
+
+        for (const question of suggestions) {
+          if (questionExists(question)) continue;
+
+          const { data, error } = await supabaseClient.rpc(
+            "create_guiding_question",
+            {
+              p_retro_id: state.retroId,
+              p_session_id: state.participantSessionId,
+              p_topic_key: topTopic.key,
+              p_pregunta: question,
+              p_origen: "automatica"
+            }
+          );
+
+          if (error) throw error;
+          if (!data?.success) {
+            throw new Error(data?.message || "No se pudo crear la pregunta guía.");
+          }
+          added += 1;
+        }
+
+        await loadGuidingQuestions();
+        render();
+
+        alert(
+          added
+            ? `${added} pregunta${added === 1 ? "" : "s"} guía generada${added === 1 ? "" : "s"}.`
+            : "Las preguntas sugeridas ya estaban cargadas."
+        );
+      } catch (error) {
+        console.error("Error generando preguntas guía:", error);
+        alert("No se pudieron generar las preguntas guía.\n\n" + error.message);
+        generateQuestionsBtn.disabled = false;
+        generateQuestionsBtn.textContent = "Generar preguntas guía";
+      }
+    };
+  }
+
+  const addGuidingQuestionBtn =
+    document.querySelector("#addGuidingQuestionBtn");
+
+  if (addGuidingQuestionBtn) {
+    addGuidingQuestionBtn.onclick = async () => {
+      const input = document.querySelector("#guidingQuestionText");
+      const text = input ? input.value.trim() : "";
+
+      if (!text) {
+        alert("Escribí una pregunta.");
+        if (input) input.focus();
+        return;
+      }
+
+      if (questionExists(text)) {
+        alert("Esa pregunta ya fue agregada.");
+        return;
+      }
+
+      const topTopic = getTopVotedTopic();
+
+      addGuidingQuestionBtn.disabled = true;
+      addGuidingQuestionBtn.textContent = "Guardando…";
+
+      try {
+        const { data, error } = await supabaseClient.rpc(
+          "create_guiding_question",
+          {
+            p_retro_id: state.retroId,
+            p_session_id: state.participantSessionId,
+            p_topic_key: topTopic?.key || null,
+            p_pregunta: text,
+            p_origen: "manual"
+          }
+        );
+
+        if (error) throw error;
+        if (!data?.success) {
+          throw new Error(data?.message || "No se pudo guardar la pregunta.");
+        }
+
+        await loadGuidingQuestions();
+        render();
+      } catch (error) {
+        console.error("Error agregando pregunta guía:", error);
+        alert("No se pudo agregar la pregunta.\n\n" + error.message);
+        addGuidingQuestionBtn.disabled = false;
+        addGuidingQuestionBtn.textContent = "+ Agregar pregunta";
+      }
+    };
+  }
+
+  document
+    .querySelectorAll(".delete-guiding-question")
+    .forEach(button => {
+      button.onclick = async () => {
+        if (!state.isFacilitator) return;
+
+        const questionId = button.dataset.questionId;
+        const question = state.guidingQuestions.find(item => item.id === questionId);
+        if (!question) return;
+
+        if (!confirm(`¿Eliminar esta pregunta?\n\n${question.text}`)) return;
+
+        try {
+          const { data, error } = await supabaseClient.rpc(
+            "delete_guiding_question",
+            {
+              p_retro_id: state.retroId,
+              p_session_id: state.participantSessionId,
+              p_question_id: questionId
+            }
+          );
+
+          if (error) throw error;
+          if (!data?.success) {
+            throw new Error(data?.message || "No se pudo eliminar la pregunta.");
+          }
+
+          await loadGuidingQuestions();
+          render();
+        } catch (error) {
+          console.error("Error eliminando pregunta guía:", error);
+          alert("No se pudo eliminar la pregunta.\n\n" + error.message);
+        }
+      };
+    });
+
+
+  // ===================================================
   // ACCIONES
   // ===================================================
 
@@ -4362,6 +4672,8 @@ async function initialize() {
 
   await loadTopics();
 
+  await loadGuidingQuestions();
+
   await loadActions();
 
   await loadVotes();
@@ -4382,6 +4694,8 @@ async function initialize() {
   subscribeToCards();
 
   subscribeToTopics();
+
+  subscribeToGuidingQuestions();
 
   subscribeToVotes();
 

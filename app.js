@@ -3637,21 +3637,22 @@ document
   .onclick = async () => {
 
     if (!state.isFacilitator) {
-
       return;
-
     }
 
+    // En el lobby, el mismo botón inicia la retro.
+    // Una vez iniciada, pasa a avanzar de etapa.
+    if (!state.retroStarted) {
+      await startRetro();
+      return;
+    }
 
     if (
       state.step >=
       steps.length - 1
     ) {
-
       return;
-
     }
-
 
     await advanceRetro();
 

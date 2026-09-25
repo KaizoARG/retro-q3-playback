@@ -2645,22 +2645,22 @@ const screens = [
                       ${
                         isFacilitator
                           ? `
-                            <button
-                              type="button"
-                              class="delete-guiding-question"
-                              data-question-id="${escapeHtml(question.id)}"
-                              title="Eliminar pregunta"
-                              aria-label="Eliminar pregunta"
-                              style="
-                                flex-shrink:0;
-                                width:34px;
-                                height:34px;
-                                border-radius:9px;
-                                cursor:pointer;
-                                background:transparent;
-                                border:1px solid rgba(255,255,255,.14);
-                                color:inherit;
-                              ">🗑️</button>
+                            <div style="display:flex;gap:8px;flex-shrink:0;">
+                              <button
+                                type="button"
+                                class="edit-guiding-question"
+                                data-question-id="${escapeHtml(question.id)}"
+                                title="Modificar pregunta"
+                                aria-label="Modificar pregunta"
+                                style="width:34px;height:34px;border-radius:9px;cursor:pointer;background:transparent;border:1px solid rgba(255,255,255,.14);color:inherit;">✏️</button>
+                              <button
+                                type="button"
+                                class="delete-guiding-question"
+                                data-question-id="${escapeHtml(question.id)}"
+                                title="Eliminar pregunta"
+                                aria-label="Eliminar pregunta"
+                                style="width:34px;height:34px;border-radius:9px;cursor:pointer;background:transparent;border:1px solid rgba(255,255,255,.14);color:inherit;">🗑️</button>
+                            </div>
                           `
                           : ""
                       }
@@ -4301,15 +4301,30 @@ async function bind() {
       }
 
       const suggestions = buildGuidingQuestionSuggestions(topTopic, topicCards);
+      const automaticQuestions = state.guidingQuestions.filter(
+        question => question.origin === "automatica"
+      );
+      const automaticSlots = Math.max(0, 3 - automaticQuestions.length);
+      const questionsToGenerate = suggestions
+        .filter(question => !questionExists(question))
+        .slice(0, automaticSlots);
+
+      if (!questionsToGenerate.length) {
+        alert(
+          automaticQuestions.length >= 3
+            ? "Ya se generaron las 3 preguntas guía automáticas permitidas.\n\nPodés modificarlas o agregar preguntas manualmente."
+            : "Las preguntas sugeridas ya estaban cargadas."
+        );
+        return;
+      }
+
       generateQuestionsBtn.disabled = true;
       generateQuestionsBtn.textContent = "Generando…";
 
       try {
         let added = 0;
 
-        for (const question of suggestions) {
-          if (questionExists(question)) continue;
-
+        for (const question of questionsToGenerate) {
           const { data, error } = await supabaseClient.rpc(
             "create_guiding_question",
             {
@@ -4396,6 +4411,56 @@ async function bind() {
       }
     };
   }
+
+  document
+    .querySelectorAll(".edit-guiding-question")
+    .forEach(button => {
+      button.onclick = async () => {
+        if (!state.isFacilitator) return;
+
+        const questionId = button.dataset.questionId;
+        const question = state.guidingQuestions.find(item => item.id === questionId);
+        if (!question) return;
+
+        const newText = prompt("Modificar pregunta guía:", question.text);
+        const cleanText = String(newText || "").trim();
+
+        if (!cleanText || cleanText === question.text) return;
+
+        const duplicate = state.guidingQuestions.some(item =>
+          item.id !== questionId && normalizeTopicText(item.text) === normalizeTopicText(cleanText)
+        );
+
+        if (duplicate) {
+          alert("Esa pregunta ya fue agregada.");
+          return;
+        }
+
+        try {
+          const { data, error } = await supabaseClient.rpc(
+            "update_guiding_question",
+            {
+              p_retro_id: state.retroId,
+              p_session_id: state.participantSessionId,
+              p_question_id: questionId,
+              p_pregunta: cleanText
+            }
+          );
+
+          if (error) throw error;
+          if (!data?.success) {
+            throw new Error(data?.message || "No se pudo modificar la pregunta.");
+          }
+
+          await loadGuidingQuestions();
+          render();
+        } catch (error) {
+          console.error("Error modificando pregunta guía:", error);
+          alert("No se pudo modificar la pregunta.\n\n" + error.message);
+        }
+      };
+    });
+
 
   document
     .querySelectorAll(".delete-guiding-question")

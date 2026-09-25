@@ -123,7 +123,6 @@ const screens = [
   </section>`,
 
 
-
   // ===================================================
   // 2. CHECK-IN
   // ===================================================
@@ -156,7 +155,6 @@ const screens = [
     </div>
 
   </section>`,
-
 
 
   // ===================================================
@@ -196,14 +194,12 @@ const screens = [
 
         </select>
 
-
         <textarea
           id="cardText"
           placeholder="Escribí tu tarjeta...">
         </textarea>
 
       </div>
-
 
       <button
         class="primary"
@@ -240,7 +236,6 @@ const screens = [
 
         </div>
 
-
         ${
           state.cards
             .filter(c => c.etapa === "green")
@@ -255,7 +250,6 @@ const screens = [
         }
 
       </div>
-
 
 
       <!-- NOS TRABÓ -->
@@ -276,7 +270,6 @@ const screens = [
 
         </div>
 
-
         ${
           state.cards
             .filter(c => c.etapa === "red")
@@ -291,7 +284,6 @@ const screens = [
         }
 
       </div>
-
 
 
       <!-- APRENDIMOS -->
@@ -312,7 +304,6 @@ const screens = [
 
         </div>
 
-
         ${
           state.cards
             .filter(c => c.etapa === "blue")
@@ -328,11 +319,9 @@ const screens = [
 
       </div>
 
-
     </div>
 
   </section>`,
-
 
 
   // ===================================================
@@ -354,7 +343,6 @@ const screens = [
       tarjetas similares. Acá mostramos cómo quedaría
       el resultado.
     </p>
-
 
     <div class="topic-list">
 
@@ -386,7 +374,6 @@ const screens = [
   </section>`,
 
 
-
   // ===================================================
   // 5. VOTACIÓN
   // ===================================================
@@ -406,7 +393,6 @@ const screens = [
       más importantes para conversar.
     </p>
 
-
     <div class="topic-list">
 
       ${[
@@ -424,7 +410,6 @@ const screens = [
             ${x}
           </strong>
 
-
           <button
             class="primary vote"
             data-topic="${i}">
@@ -440,7 +425,6 @@ const screens = [
     </div>
 
   </section>`,
-
 
 
   // ===================================================
@@ -462,7 +446,6 @@ const screens = [
       La pregunta ahora no es solamente qué pasó,
       sino qué hay detrás.
     </p>
-
 
     <div
       class="card"
@@ -496,7 +479,6 @@ const screens = [
   </section>`,
 
 
-
   // ===================================================
   // 7. ACCIONES
   // ===================================================
@@ -515,7 +497,6 @@ const screens = [
       Una acción útil tiene un responsable y una fecha.
       Evitemos acciones genéricas.
     </p>
-
 
     <div class="action-form">
 
@@ -538,7 +519,6 @@ const screens = [
 
     </div>
 
-
     <button
       class="primary"
       id="addAction"
@@ -548,37 +528,35 @@ const screens = [
 
     </button>
 
-
     <div class="actions">
 
-      ${state.actions
+      ${
+        state.actions
+          .map(a =>
 
-        .map(a =>
+            `<div class="action">
 
-          `<div class="action">
+              <div>
 
-            <div>
+                <strong>
+                  ${a.text}
+                </strong>
 
-              <strong>
-                ${a.text}
-              </strong>
+                <div class="badge">
+                  ${a.owner} · ${a.date}
+                </div>
 
-              <div class="badge">
-                ${a.owner} · ${a.date}
               </div>
 
-            </div>
+            </div>`
 
-          </div>`
-
-        )
-
-        .join("")}
+          )
+          .join("")
+      }
 
     </div>
 
   </section>`,
-
 
 
   // ===================================================
@@ -611,11 +589,7 @@ const screens = [
 
       </p>
 
-
       <div class="summary">
-
-
-        <!-- TEMA PRINCIPAL -->
 
         <div class="card">
 
@@ -634,9 +608,6 @@ const screens = [
 
         </div>
 
-
-
-        <!-- PRÓXIMA ACCIÓN -->
 
         <div class="card">
 
@@ -662,14 +633,11 @@ const screens = [
 
         </div>
 
-
       </div>
-
 
       <div class="big-number">
         ✓
       </div>
-
 
       <p class="badge">
         Retro finalizada · Q3 2026
@@ -731,7 +699,9 @@ async function loadCards() {
       .from("cards")
       .select("*")
       .eq("retro_id", state.retroId)
-      .order("created_at", { ascending: true });
+      .order("created_at", {
+        ascending: true
+      });
 
   if (error) {
 
@@ -764,7 +734,9 @@ async function loadActions() {
       .from("acciones")
       .select("*")
       .eq("retro_id", state.retroId)
-      .order("created_at", { ascending: true });
+      .order("created_at", {
+        ascending: true
+      });
 
   if (error) {
 
@@ -781,9 +753,11 @@ async function loadActions() {
 
       id: action.id,
 
-      text: action.descripcion,
+      text:
+        action.descripcion,
 
-      owner: action.responsable,
+      owner:
+        action.responsable,
 
       date:
         action.fecha || "Por definir"
@@ -805,6 +779,7 @@ async function loadActions() {
 function subscribeToCards() {
 
   supabaseClient
+
     .channel(
       "cards-realtime-" +
       state.retroId
@@ -887,7 +862,6 @@ async function bind() {
     });
 
 
-
   // ===================================================
   // VOTACIÓN
   // ===================================================
@@ -915,7 +889,6 @@ async function bind() {
       };
 
     });
-
 
 
   // ===================================================
@@ -980,9 +953,11 @@ async function bind() {
         data
       );
 
+
       const exists =
         state.cards.some(
-          card => card.id === data.id
+          card =>
+            card.id === data.id
         );
 
       if (!exists) {
@@ -994,7 +969,6 @@ async function bind() {
     };
 
   }
-
 
 
   // ===================================================
@@ -1109,9 +1083,10 @@ async function bind() {
       // AGREGAR AL ESTADO LOCAL
       // =================================================
 
-      state.actions.push({
+      const newAction = {
 
-        id: data.id,
+        id:
+          data.id,
 
         text:
           data.descripcion,
@@ -1122,7 +1097,12 @@ async function bind() {
         date:
           data.fecha || "Por definir"
 
-      });
+      };
+
+
+      state.actions.push(
+        newAction
+      );
 
 
       render();
@@ -1200,13 +1180,18 @@ async function initialize() {
     return;
   }
 
+
   await loadCards();
+
 
   await loadActions();
 
+
   subscribeToCards();
 
+
   render();
+
 }
 
 initialize();

@@ -759,7 +759,7 @@ function subscribeToCards() {
 	  schema: "public",
 	  table: "cards",
 	  filter: `retro_id=eq.${state.retroId}`
-	}
+	},
 
       (payload) => {
 

@@ -948,14 +948,59 @@ async function startRetro() {
 // FACILITADOR - AVANZAR
 // =====================================================
 
+async function ensureFacilitatorControl() {
+
+  if (!state.retroId || !state.participantSessionId) {
+    return false;
+  }
+
+  // Siempre verificamos contra Supabase antes de ejecutar una acción
+  // exclusiva del facilitador. Esto evita que un evento Realtime
+  // o un estado local viejo deje al navegador creyendo que tiene el control.
+  await refreshRetroState();
+
+  if (state.isFacilitator) {
+    return true;
+  }
+
+  const { data, error } = await supabaseClient.rpc(
+    "claim_facilitator",
+    {
+      p_retro_id: state.retroId,
+      p_session_id: state.participantSessionId
+    }
+  );
+
+  if (error || !data?.is_facilitator) {
+    console.error(
+      "No se pudo confirmar el control de facilitación:",
+      error || data
+    );
+    return false;
+  }
+
+  await refreshRetroState();
+  await loadParticipants();
+  return state.isFacilitator;
+}
+
+
 async function advanceRetro() {
 
-  if (!state.isFacilitator) {
+  const hasControl = await ensureFacilitatorControl();
+
+  if (!hasControl) {
 
     console.log(
       "Solo el facilitador puede avanzar la retro."
     );
 
+    alert(
+      "No se pudo avanzar la retro.\n\n" +
+      "La sesión actual no figura como facilitador en la sala."
+    );
+
+    render();
     return;
   }
 

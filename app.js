@@ -52,7 +52,15 @@ const state = {
   retroId: null,
 
   // Acciones
-  actions: []
+  actions: [],
+
+  // ---------------------------------------------------
+  // FACILITADOR
+  // ---------------------------------------------------
+
+  isFacilitator: false,
+
+  facilitatorSessionId: null
 };
 
 
@@ -352,27 +360,781 @@ async function loadMyVotes() {
 
 
 // =====================================================
+// FACILITADOR - ESTADO
+// =====================================================
+
+function updateFacilitatorState() {
+
+  state.isFacilitator =
+    Boolean(
+      state.facilitatorSessionId &&
+      state.participantSessionId &&
+      state.facilitatorSessionId ===
+        state.participantSessionId
+    );
+
+}
+
+
+// =====================================================
+// FACILITADOR - TOMAR CONTROL
+// =====================================================
+
+async function claimFacilitator() {
+
+  if (
+    !state.retroId ||
+    !state.participantSessionId
+  ) {
+    return;
+  }
+
+  const {
+    data,
+    error
+  } = await supabaseClient
+    .rpc(
+      "claim_facilitator",
+      {
+        p_retro_id:
+          state.retroId,
+
+        p_session_id:
+          state.participantSessionId
+      }
+    );
+
+
+  if (error) {
+
+    console.error(
+      "Error tomando control como facilitador:",
+      error
+    );
+
+    alert(
+      "No se pudo tomar el control como facilitador.\n\n" +
+      error.message
+    );
+
+    return;
+  }
+
+
+  console.log(
+    "Resultado claim facilitador:",
+    data
+  );
+
+
+  // ---------------------------------------------------
+  // Volvemos a consultar la retro para conocer
+  // el estado real del facilitador.
+  // ---------------------------------------------------
+
+  await refreshRetroState();
+
+  render();
+}
+
+
+// =====================================================
+// FACILITADOR - CONFIRMACIÓN
+// =====================================================
+
+function openFacilitatorConfirmation() {
+
+  const modal =
+    document.querySelector("#facilitatorModal");
+
+  if (!modal) {
+    return;
+  }
+
+  modal.style.display = "flex";
+}
+
+
+function closeFacilitatorConfirmation() {
+
+  const modal =
+    document.querySelector("#facilitatorModal");
+
+  if (!modal) {
+    return;
+  }
+
+  modal.style.display = "none";
+}
+
+
+async function confirmClaimFacilitator() {
+
+  closeFacilitatorConfirmation();
+
+  await claimFacilitator();
+}
+
+
+// =====================================================
+// FACILITADOR - LIBERAR CONTROL
+// =====================================================
+
+async function releaseFacilitator() {
+
+  if (
+    !state.retroId ||
+    !state.participantSessionId
+  ) {
+    return;
+  }
+
+  const confirmed =
+    window.confirm(
+      "¿Liberar el control como facilitador?\n\n" +
+      "Otro participante podrá tomar el control de la retro."
+    );
+
+  if (!confirmed) {
+    return;
+  }
+
+
+  const {
+    data,
+    error
+  } = await supabaseClient
+    .rpc(
+      "release_facilitator",
+      {
+        p_retro_id:
+          state.retroId,
+
+        p_session_id:
+          state.participantSessionId
+      }
+    );
+
+
+  if (error) {
+
+    console.error(
+      "Error liberando control:",
+      error
+    );
+
+    alert(
+      "No se pudo liberar el control.\n\n" +
+      error.message
+    );
+
+    return;
+  }
+
+
+  console.log(
+    "Control de facilitador liberado:",
+    data
+  );
+
+
+  await refreshRetroState();
+
+  render();
+}
+
+
+// =====================================================
+// FACILITADOR - AVANZAR
+// =====================================================
+
+async function advanceRetro() {
+
+  if (!state.isFacilitator) {
+
+    console.log(
+      "Solo el facilitador puede avanzar la retro."
+    );
+
+    return;
+  }
+
+
+  if (
+    state.step >=
+    steps.length - 1
+  ) {
+    return;
+  }
+
+
+  const {
+    data,
+    error
+  } = await supabaseClient
+    .rpc(
+      "advance_retro",
+      {
+        p_retro_id:
+          state.retroId,
+
+        p_session_id:
+          state.participantSessionId
+      }
+    );
+
+
+  if (error) {
+
+    console.error(
+      "Error avanzando retro:",
+      error
+    );
+
+    alert(
+      "No se pudo avanzar la retro.\n\n" +
+      error.message
+    );
+
+    return;
+  }
+
+
+  console.log(
+    "Retro avanzada:",
+    data
+  );
+
+  // El cambio de etapa llegará también por Realtime.
+  // Actualizamos localmente para que la respuesta
+  // sea inmediata.
+  if (
+    data &&
+    data.step !== undefined
+  ) {
+
+    state.step =
+      Number(data.step);
+
+  }
+
+  render();
+}
+
+
+// =====================================================
+// FACILITADOR - RETROCEDER
+// =====================================================
+
+async function previousRetroStep() {
+
+  if (!state.isFacilitator) {
+
+    console.log(
+      "Solo el facilitador puede retroceder la retro."
+    );
+
+    return;
+  }
+
+
+  if (state.step <= 0) {
+    return;
+  }
+
+
+  const {
+    data,
+    error
+  } = await supabaseClient
+    .rpc(
+      "previous_retro_step",
+      {
+        p_retro_id:
+          state.retroId,
+
+        p_session_id:
+          state.participantSessionId
+      }
+    );
+
+
+  if (error) {
+
+    console.error(
+      "Error retrocediendo retro:",
+      error
+    );
+
+    alert(
+      "No se pudo retroceder la retro.\n\n" +
+      error.message
+    );
+
+    return;
+  }
+
+
+  console.log(
+    "Retro retrocedida:",
+    data
+  );
+
+
+  if (
+    data &&
+    data.step !== undefined
+  ) {
+
+    state.step =
+      Number(data.step);
+
+  }
+
+  render();
+}
+
+
+// =====================================================
+// FACILITADOR - REFRESCAR ESTADO
+// =====================================================
+
+async function refreshRetroState() {
+
+  if (!state.retroId) {
+    return;
+  }
+
+  const {
+    data,
+    error
+  } = await supabaseClient
+    .from("retros")
+    .select(
+      "id, codigo, nombre, paso_actual, facilitador_session_id"
+    )
+    .eq("id", state.retroId)
+    .single();
+
+
+  if (error) {
+
+    console.error(
+      "Error refrescando estado de la retro:",
+      error
+    );
+
+    return;
+  }
+
+
+  state.step =
+    Number(data.paso_actual || 0);
+
+  state.facilitatorSessionId =
+    data.facilitador_session_id || null;
+
+  updateFacilitatorState();
+
+
+  console.log(
+    "Estado de retro actualizado:",
+    {
+      step: state.step,
+      facilitatorSessionId:
+        state.facilitatorSessionId,
+      isFacilitator:
+        state.isFacilitator
+    }
+  );
+}
+
+
+// =====================================================
+// CONTROL DE FACILITADOR - UI
+// =====================================================
+
+function facilitatorControls() {
+
+  let content = "";
+
+
+  // ---------------------------------------------------
+  // SOY FACILITADOR
+  // ---------------------------------------------------
+
+  if (state.isFacilitator) {
+
+    content = `
+      <div
+        style="
+          margin-bottom:28px;
+          display:flex;
+          align-items:center;
+          justify-content:space-between;
+          gap:16px;
+          flex-wrap:wrap;
+          padding:12px 16px;
+          border:1px solid rgba(84,255,209,.25);
+          border-radius:14px;
+          background:rgba(84,255,209,.05);
+        "
+      >
+
+        <div>
+          <div
+            style="
+              font-size:11px;
+              letter-spacing:.08em;
+              text-transform:uppercase;
+              opacity:.7;
+              margin-bottom:4px;
+            "
+          >
+            FACILITADOR
+          </div>
+
+          <strong>
+            Tenés el control de la retro
+          </strong>
+        </div>
+
+        <button
+          id="releaseFacilitatorBtn"
+          style="
+            padding:9px 14px;
+            border-radius:10px;
+            cursor:pointer;
+            background:transparent;
+            border:1px solid currentColor;
+          "
+        >
+          Liberar control
+        </button>
+
+      </div>
+    `;
+
+  }
+
+
+  // ---------------------------------------------------
+  // OTRO FACILITADOR
+  // ---------------------------------------------------
+
+  else if (state.facilitatorSessionId) {
+
+    content = `
+      <div
+        style="
+          margin-bottom:28px;
+          padding:12px 16px;
+          border:1px solid rgba(255,255,255,.12);
+          border-radius:14px;
+          background:rgba(255,255,255,.03);
+        "
+      >
+
+        <div
+          style="
+            font-size:11px;
+            letter-spacing:.08em;
+            text-transform:uppercase;
+            opacity:.6;
+            margin-bottom:4px;
+          "
+        >
+          PARTICIPANTE
+        </div>
+
+        <strong>
+          El facilitador controla el avance de la retro
+        </strong>
+
+      </div>
+    `;
+
+  }
+
+
+  // ---------------------------------------------------
+  // NADIE TIENE CONTROL
+  // ---------------------------------------------------
+
+  else {
+
+    content = `
+      <div
+        style="
+          margin-bottom:28px;
+          display:flex;
+          align-items:center;
+          justify-content:space-between;
+          gap:16px;
+          flex-wrap:wrap;
+          padding:12px 16px;
+          border:1px solid rgba(255,255,255,.12);
+          border-radius:14px;
+          background:rgba(255,255,255,.03);
+        "
+      >
+
+        <div>
+          <div
+            style="
+              font-size:11px;
+              letter-spacing:.08em;
+              text-transform:uppercase;
+              opacity:.6;
+              margin-bottom:4px;
+            "
+          >
+            CONTROL DE LA RETRO
+          </div>
+
+          <strong>
+            Todavía no hay un facilitador
+          </strong>
+        </div>
+
+        <button
+          id="claimFacilitatorBtn"
+          class="primary"
+          style="
+            padding:10px 16px;
+          "
+        >
+          Tomar control como facilitador
+        </button>
+
+      </div>
+    `;
+
+  }
+
+
+  return content;
+}
+
+
+// =====================================================
+// MODAL FACILITADOR
+// =====================================================
+
+function facilitatorModal() {
+
+  return `
+    <div
+      id="facilitatorModal"
+      style="
+        display:none;
+        position:fixed;
+        inset:0;
+        z-index:9999;
+        align-items:center;
+        justify-content:center;
+        padding:24px;
+        background:rgba(0,0,0,.72);
+        backdrop-filter:blur(6px);
+      "
+    >
+
+      <div
+        style="
+          width:min(460px, 100%);
+          padding:28px;
+          border-radius:18px;
+          background:#111;
+          border:1px solid rgba(255,255,255,.14);
+          box-shadow:0 20px 80px rgba(0,0,0,.5);
+        "
+      >
+
+        <div
+          style="
+            font-size:11px;
+            letter-spacing:.08em;
+            text-transform:uppercase;
+            opacity:.6;
+            margin-bottom:10px;
+          "
+        >
+          CONTROL DE LA RETRO
+        </div>
+
+        <h3
+          style="
+            margin:0 0 12px 0;
+          "
+        >
+          ¿Tomar control como facilitador?
+        </h3>
+
+        <p
+          style="
+            margin:0;
+            line-height:1.6;
+            opacity:.78;
+          "
+        >
+          Vas a controlar el avance de la retro
+          para todos los participantes.
+        </p>
+
+        <div
+          style="
+            display:flex;
+            justify-content:flex-start;
+            gap:10px;
+            margin-top:24px;
+            flex-wrap:wrap;
+          "
+        >
+
+          <button
+            id="confirmClaimFacilitatorBtn"
+            class="primary"
+            style="
+              padding:11px 16px;
+            "
+          >
+            Sí, tomar el control
+          </button>
+
+          <button
+            id="cancelClaimFacilitatorBtn"
+            style="
+              padding:11px 16px;
+              border-radius:10px;
+              cursor:pointer;
+              background:transparent;
+              border:1px solid rgba(255,255,255,.18);
+              color:inherit;
+            "
+          >
+            Cancelar
+          </button>
+
+        </div>
+
+      </div>
+
+    </div>
+  `;
+}
+
+
+// =====================================================
 // RENDER PRINCIPAL
 // =====================================================
 
 function render() {
 
-  document.querySelector("#stepLabel").textContent =
+  const stepLabel =
+    document.querySelector("#stepLabel");
+
+  const progressBar =
+    document.querySelector("#progressBar");
+
+  const backBtn =
+    document.querySelector("#backBtn");
+
+  const nextBtn =
+    document.querySelector("#nextBtn");
+
+  const app =
+    document.querySelector("#app");
+
+
+  if (!stepLabel || !progressBar || !backBtn || !nextBtn || !app) {
+    console.error(
+      "No se encontraron elementos principales de la interfaz."
+    );
+
+    return;
+  }
+
+
+  stepLabel.textContent =
     `${state.step + 1} / ${steps.length}`;
 
-  document.querySelector("#progressBar").style.width =
+
+  progressBar.style.width =
     `${((state.step + 1) / steps.length) * 100}%`;
 
-  document.querySelector("#backBtn").style.visibility =
-    state.step === 0 ? "hidden" : "visible";
 
-  document.querySelector("#nextBtn").textContent =
-    state.step === steps.length - 1
-      ? "Reiniciar ↻"
-      : (state.step === 0 ? "Comenzar →" : "Continuar →");
+  // ---------------------------------------------------
+  // BOTÓN ATRÁS
+  // ---------------------------------------------------
 
-  document.querySelector("#app").innerHTML =
-    screens[state.step]();
+  if (
+    state.isFacilitator &&
+    state.step > 0
+  ) {
+
+    backBtn.style.visibility =
+      "visible";
+
+    backBtn.disabled =
+      false;
+
+  } else {
+
+    backBtn.style.visibility =
+      "hidden";
+
+    backBtn.disabled =
+      true;
+
+  }
+
+
+  // ---------------------------------------------------
+  // BOTÓN SIGUIENTE
+  // ---------------------------------------------------
+
+  if (state.step === steps.length - 1) {
+
+    nextBtn.textContent =
+      "Retro finalizada ✓";
+
+    nextBtn.disabled =
+      true;
+
+  }
+
+  else if (!state.isFacilitator) {
+
+    nextBtn.textContent =
+      "Esperando al facilitador";
+
+    nextBtn.disabled =
+      true;
+
+  }
+
+  else {
+
+    nextBtn.textContent =
+      state.step === 0
+        ? "Comenzar →"
+        : "Continuar →";
+
+    nextBtn.disabled =
+      false;
+
+  }
+
+
+  // ---------------------------------------------------
+  // CONTENIDO
+  // ---------------------------------------------------
+
+  app.innerHTML =
+    facilitatorControls() +
+    screens[state.step]() +
+    facilitatorModal();
+
 
   bind();
 }
@@ -1245,7 +2007,9 @@ async function loadRetro() {
   const { data, error } =
     await supabaseClient
       .from("retros")
-      .select("id, codigo, nombre")
+      .select(
+        "id, codigo, nombre, paso_actual, facilitador_session_id"
+      )
       .eq("codigo", RETRO_CODE)
       .single();
 
@@ -1266,6 +2030,14 @@ async function loadRetro() {
 
   state.retroId =
     data.id;
+
+  state.step =
+    Number(data.paso_actual || 0);
+
+  state.facilitatorSessionId =
+    data.facilitador_session_id || null;
+
+  updateFacilitatorState();
 
   console.log(
     "Retro cargada:",
@@ -1386,6 +2158,77 @@ async function loadVotes() {
     "Votos cargados:",
     state.votes
   );
+}
+
+
+// =====================================================
+// REALTIME - RETRO / FACILITADOR
+// =====================================================
+
+function subscribeToRetro() {
+
+  supabaseClient
+
+    .channel(
+      "retro-realtime-" +
+      state.retroId
+    )
+
+    .on(
+      "postgres_changes",
+      {
+        event: "UPDATE",
+        schema: "public",
+        table: "retros",
+        filter:
+          `id=eq.${state.retroId}`
+      },
+
+      payload => {
+
+        console.log(
+          "Cambio de estado de retro recibido:",
+          payload
+        );
+
+
+        if (!payload.new) {
+          return;
+        }
+
+
+        const newStep =
+          Number(
+            payload.new.paso_actual || 0
+          );
+
+        const newFacilitator =
+          payload.new.facilitador_session_id ||
+          null;
+
+
+        state.step =
+          newStep;
+
+        state.facilitatorSessionId =
+          newFacilitator;
+
+        updateFacilitatorState();
+
+
+        render();
+
+      }
+    )
+
+    .subscribe(status => {
+
+      console.log(
+        "Realtime retro:",
+        status
+      );
+
+    });
 }
 
 
@@ -1652,6 +2495,95 @@ function subscribeToActions() {
 // =====================================================
 
 async function bind() {
+
+
+  // ===================================================
+  // FACILITADOR - TOMAR CONTROL
+  // ===================================================
+
+  const claimButton =
+    document.querySelector(
+      "#claimFacilitatorBtn"
+    );
+
+  if (claimButton) {
+
+    claimButton.onclick = () => {
+
+      openFacilitatorConfirmation();
+
+    };
+
+  }
+
+
+  // ===================================================
+  // FACILITADOR - CONFIRMAR
+  // ===================================================
+
+  const confirmClaimButton =
+    document.querySelector(
+      "#confirmClaimFacilitatorBtn"
+    );
+
+  if (confirmClaimButton) {
+
+    confirmClaimButton.onclick = async () => {
+
+      confirmClaimButton.disabled =
+        true;
+
+      confirmClaimButton.textContent =
+        "Tomando control...";
+
+      await confirmClaimFacilitator();
+
+    };
+
+  }
+
+
+  // ===================================================
+  // FACILITADOR - CANCELAR
+  // ===================================================
+
+  const cancelClaimButton =
+    document.querySelector(
+      "#cancelClaimFacilitatorBtn"
+    );
+
+  if (cancelClaimButton) {
+
+    cancelClaimButton.onclick = () => {
+
+      closeFacilitatorConfirmation();
+
+    };
+
+  }
+
+
+  // ===================================================
+  // FACILITADOR - LIBERAR
+  // ===================================================
+
+  const releaseButton =
+    document.querySelector(
+      "#releaseFacilitatorBtn"
+    );
+
+  if (releaseButton) {
+
+    releaseButton.onclick = async () => {
+
+      releaseButton.disabled =
+        true;
+
+      await releaseFacilitator();
+
+    };
+
+  }
 
 
   // ===================================================
@@ -2108,32 +3040,26 @@ async function bind() {
 
 document
   .querySelector("#nextBtn")
-  .onclick = () => {
+  .onclick = async () => {
+
+    if (!state.isFacilitator) {
+
+      return;
+
+    }
+
 
     if (
-      state.step ===
+      state.step >=
       steps.length - 1
     ) {
 
-      state.step = 0;
-
-      state.energy = null;
-
-      state.votes = {};
-
-      loadVotes();
-
-      render();
+      return;
 
     }
 
-    else {
 
-      state.step++;
-
-      render();
-
-    }
+    await advanceRetro();
 
   };
 
@@ -2144,15 +3070,23 @@ document
 
 document
   .querySelector("#backBtn")
-  .onclick = () => {
+  .onclick = async () => {
 
-    if (state.step > 0) {
+    if (!state.isFacilitator) {
 
-      state.step--;
-
-      render();
+      return;
 
     }
+
+
+    if (state.step <= 0) {
+
+      return;
+
+    }
+
+
+    await previousRetroStep();
 
   };
 
@@ -2200,6 +3134,13 @@ async function initialize() {
 
 
   // ---------------------------------------------------
+  // REFRESCAR ESTADO DE FACILITADOR
+  // ---------------------------------------------------
+
+  await refreshRetroState();
+
+
+  // ---------------------------------------------------
   // DATOS
   // ---------------------------------------------------
 
@@ -2215,6 +3156,8 @@ async function initialize() {
   // ---------------------------------------------------
   // REALTIME
   // ---------------------------------------------------
+
+  subscribeToRetro();
 
   subscribeToCards();
 

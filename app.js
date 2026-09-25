@@ -3430,7 +3430,17 @@ async function bind() {
 
   if (generateTopicsBtn) {
     generateTopicsBtn.onclick = async () => {
-      if (!state.isFacilitator) return;
+      console.log("Click en Generar tópicos", {
+        isFacilitator: state.isFacilitator,
+        cards: state.cards.length,
+        retroId: state.retroId,
+        step: state.step
+      });
+
+      if (!state.isFacilitator) {
+        alert("Solo el facilitador puede generar los tópicos.");
+        return;
+      }
 
       if (!state.cards.length) {
         alert("Todavía no hay tarjetas para agrupar.");
@@ -3452,21 +3462,43 @@ async function bind() {
           topic_key: assignments.get(card.id)?.key || null
         }));
 
+        console.log("Iniciando generación de tópicos", {
+          cards: state.cards.length,
+          updates
+        });
+
+        let updatedCount = 0;
+
         for (const update of updates) {
-          const { error } = await supabaseClient
+          const { data, error } = await supabaseClient
             .from("cards")
             .update({ topic_key: update.topic_key })
-            .eq("id", update.id);
+            .eq("id", update.id)
+            .eq("retro_id", state.retroId)
+            .select("id, topic_key");
 
           if (error) throw error;
+
+          if (!data || data.length === 0) {
+            throw new Error(
+              `No se pudo actualizar la tarjeta ${update.id}. Verificá las políticas de acceso (RLS) de la tabla cards.`
+            );
+          }
+
+          updatedCount += data.length;
         }
 
         await loadCards();
         render();
 
-        console.log(
-          "Tópicos generados:",
-          candidates.map(topic => topic.label)
+        console.log("Tópicos generados:", candidates.map(topic => topic.label));
+        console.log(`Tarjetas actualizadas: ${updatedCount}/${updates.length}`);
+
+        // Feedback visible para el facilitador.
+        alert(
+          `Agrupación generada correctamente\n\n` +
+          `${candidates.length} tópicos\n` +
+          `${updatedCount} tarjetas agrupadas`
         );
       } catch (error) {
         console.error("Error generando tópicos:", error);

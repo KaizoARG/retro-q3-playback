@@ -3382,6 +3382,142 @@ function bindLanding() {
   };
 }
 
+
+// =====================================================
+// ADMIN PRIVADO
+// =====================================================
+
+let adminRetros = [];
+
+function adminLoginView(message = "") {
+  return `
+    <section style="max-width:560px;margin:0 auto;padding:80px 20px">
+      <div class="pill">ADMINISTRACIÓN PRIVADA</div>
+      <h1 style="font-size:clamp(38px,5vw,56px);margin:22px 0 12px">Administrar retrospectivas</h1>
+      <p class="lead">Ingresá con tu cuenta de administrador para gestionar qué retrospectivas aparecen en el historial público.</p>
+      ${message ? `<div class="card" style="margin-top:20px">${escapeHtml(message)}</div>` : ""}
+      <div class="card" style="margin-top:24px">
+        <label class="badge" for="adminEmail">EMAIL</label>
+        <input id="adminEmail" type="email" autocomplete="username" style="width:100%;margin-top:10px;padding:13px;border-radius:10px;background:#111;color:inherit;border:1px solid rgba(255,255,255,.18)">
+        <label class="badge" for="adminPassword" style="display:block;margin-top:20px">CONTRASEÑA</label>
+        <input id="adminPassword" type="password" autocomplete="current-password" style="width:100%;margin-top:10px;padding:13px;border-radius:10px;background:#111;color:inherit;border:1px solid rgba(255,255,255,.18)">
+        <button id="adminLoginBtn" class="primary" style="margin-top:24px;width:100%;padding:14px">Ingresar →</button>
+      </div>
+      <p style="margin-top:18px;opacity:.55;font-size:13px">Esta sección está protegida por autenticación de Supabase.</p>
+    </section>
+  `;
+}
+
+function adminPanelView() {
+  return `
+    <section style="max-width:1120px;margin:0 auto;padding:56px 20px 80px">
+      <div style="display:flex;justify-content:space-between;align-items:end;gap:16px;flex-wrap:wrap">
+        <div>
+          <div class="pill">ADMINISTRACIÓN PRIVADA</div>
+          <h1 style="margin:18px 0 8px">Retrospectivas</h1>
+          <p class="lead" style="margin:0">Administrá cuáles quedan disponibles en el historial público.</p>
+        </div>
+        <button id="adminLogoutBtn" style="padding:10px 14px">Cerrar sesión</button>
+      </div>
+      <div class="card" style="margin-top:32px">
+        ${adminRetros.length ? adminRetros.map(adminRetroRow).join("") : `<p style="opacity:.65;margin:0">No hay retrospectivas registradas.</p>`}
+      </div>
+    </section>
+  `;
+}
+
+function adminRetroRow(retro) {
+  const teams = escapeHtml(retro.equipos || retro.nombre || "Equipos no definidos");
+  const date = escapeHtml(formatLandingDate(retro.fecha));
+  const published = !!retro.publicada;
+  const status = retro.finalizada_en ? "Finalizada" : "En preparación";
+  return `
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:18px;padding:18px 0;border-bottom:1px solid rgba(255,255,255,.08);flex-wrap:wrap">
+      <div style="min-width:280px;flex:1">
+        <div style="font-size:18px;font-weight:700">${teams} · ${date}</div>
+        <div style="opacity:.65;margin-top:5px">${status} · ${published ? "Visible públicamente" : "Archivada"}</div>
+      </div>
+      <button class="admin-toggle-public-btn" data-retro-id="${retro.id}" data-publicada="${published}" style="padding:9px 13px">
+        ${published ? "Archivar" : "Publicar"}
+      </button>
+    </div>
+  `;
+}
+
+async function loadAdminRetros() {
+  const { data, error } = await supabaseClient.rpc("get_admin_retro_history");
+  if (error) throw error;
+  adminRetros = data || [];
+}
+
+async function renderAdmin() {
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  if (!session) {
+    landingShell(adminLoginView());
+    bindAdminLogin();
+    return;
+  }
+
+  try {
+    await loadAdminRetros();
+  } catch (error) {
+    landingShell(adminLoginView("La cuenta autenticada no tiene permisos de administrador."));
+    await supabaseClient.auth.signOut();
+    bindAdminLogin();
+    return;
+  }
+
+  landingShell(adminPanelView());
+  bindAdminPanel();
+}
+
+function bindAdminLogin() {
+  const btn = document.querySelector("#adminLoginBtn");
+  if (!btn) return;
+  btn.onclick = async () => {
+    const email = document.querySelector("#adminEmail")?.value.trim();
+    const password = document.querySelector("#adminPassword")?.value || "";
+    if (!email || !password) return alert("Ingresá email y contraseña.");
+    btn.disabled = true;
+    btn.textContent = "Ingresando…";
+    const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+    if (error) {
+      btn.disabled = false;
+      btn.textContent = "Ingresar →";
+      return alert("No se pudo iniciar sesión.\n\n" + error.message);
+    }
+    await renderAdmin();
+  };
+}
+
+function bindAdminPanel() {
+  const logout = document.querySelector("#adminLogoutBtn");
+  if (logout) logout.onclick = async () => {
+    await supabaseClient.auth.signOut();
+    await renderAdmin();
+  };
+
+  document.querySelectorAll(".admin-toggle-public-btn").forEach(btn => {
+    btn.onclick = async () => {
+      const current = btn.dataset.publicada === "true";
+      btn.disabled = true;
+      const { error } = await supabaseClient.rpc("set_retro_publicada", {
+        p_retro_id: btn.dataset.retroId,
+        p_publicada: !current
+      });
+      if (error) {
+        btn.disabled = false;
+        return alert("No se pudo actualizar la retrospectiva.\n\n" + error.message);
+      }
+      await renderAdmin();
+    };
+  });
+}
+
+async function initializeAdmin() {
+  await renderAdmin();
+}
+
 async function initializeLanding() {
   await loadLandingRetros();
   await renderLanding();
@@ -5637,6 +5773,13 @@ document
 // =====================================================
 
 async function initialize() {
+
+  const isAdminRoute = urlParams.get("admin") === "1";
+
+  if (isAdminRoute) {
+    await initializeAdmin();
+    return;
+  }
 
   if (!RETRO_CODE) {
     await initializeLanding();

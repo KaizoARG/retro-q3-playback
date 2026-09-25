@@ -184,6 +184,7 @@ function buildGuidingQuestionSuggestions(topic, cards) {
   if (!topic) return [];
 
   const label = topic.label;
+  const quotedLabel = `"${label}"`;
   const focusWords = getQuestionFocusWords(cards, label);
   const focus = focusWords.length
     ? `, especialmente alrededor de ${focusWords.join(" y ")}`
@@ -193,13 +194,13 @@ function buildGuidingQuestionSuggestions(topic, cards) {
   const blueCount = cards.filter(card => card.etapa === "blue").length;
 
   const suggestions = [
-    `¿Qué patrón común hay detrás de las situaciones vinculadas a ${label}${focus}?`,
+    `¿Qué patrón común hay detrás de las situaciones vinculadas a ${quotedLabel}${focus}?`,
     redCount > 0
       ? `¿Qué condición de nuestro sistema de trabajo está generando o sosteniendo los problemas asociados a ${label}?`
-      : `¿Qué parte de nuestra forma de trabajar podríamos cambiar para mejorar lo que aparece alrededor de ${label}?`,
+      : `¿Qué parte de nuestra forma de trabajar podríamos cambiar para mejorar lo que aparece alrededor de ${quotedLabel}?`,
     blueCount > 0
-      ? `¿Qué aprendimos de estas situaciones que deberíamos incorporar a nuestra forma de trabajar para que ${label} evolucione?`
-      : `¿Qué información, decisión o coordinación nos está faltando para abordar mejor ${label}?`
+      ? `¿Qué aprendimos de estas situaciones que deberíamos incorporar a nuestra forma de trabajar para que ${quotedLabel} evolucione?`
+      : `¿Qué información, decisión o coordinación nos está faltando para abordar mejor ${quotedLabel}?`
   ];
 
   return Array.from(new Set(suggestions)).slice(0, 3);

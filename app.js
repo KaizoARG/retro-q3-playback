@@ -24,8 +24,8 @@ const state = {
   votes: {},
   cards: [],
   retroId: null,
-
-	actions: []
+  actions: []
+};
 
 
 // =====================================================
@@ -585,84 +585,98 @@ const screens = [
   // 8. CIERRE
   // ===================================================
 
-  () => `<section class="center">
+  () => {
 
-    <div class="eyebrow">
-      Cierre
-    </div>
+    const lastAction =
+      state.actions.length > 0
+        ? state.actions[state.actions.length - 1]
+        : null;
 
-    <h2>
-      Nos llevamos esto.
-    </h2>
+    return `<section class="center">
 
-    <p
-      class="lead"
-      style="margin:auto">
+      <div class="eyebrow">
+        Cierre
+      </div>
 
-      La retro termina cuando la conversación
-      se transforma en una decisión visible.
+      <h2>
+        Nos llevamos esto.
+      </h2>
 
-    </p>
+      <p
+        class="lead"
+        style="margin:auto">
+
+        La retro termina cuando la conversación
+        se transforma en una decisión visible.
+
+      </p>
 
 
-    <div class="summary">
+      <div class="summary">
 
 
-      <!-- TEMA PRINCIPAL -->
+        <!-- TEMA PRINCIPAL -->
 
-      <div class="card">
+        <div class="card">
 
-        <div class="badge">
-          TEMA PRINCIPAL
+          <div class="badge">
+            TEMA PRINCIPAL
+          </div>
+
+          <h3>
+            Dependencias entre equipos
+          </h3>
+
+          <p>
+            Necesitamos anticipar dependencias
+            y hacerlas visibles antes de comprometer trabajo.
+          </p>
+
         </div>
 
-        <h3>
-          Dependencias entre equipos
-        </h3>
 
-        <p>
-          Necesitamos anticipar dependencias
-          y hacerlas visibles antes de comprometer trabajo.
-        </p>
+
+        <!-- PRÓXIMA ACCIÓN -->
+
+        <div class="card">
+
+          <div class="badge">
+            PRÓXIMA ACCIÓN
+          </div>
+
+          <h3>
+            ${
+              lastAction
+                ? lastAction.text
+                : "Todavía no hay acciones"
+            }
+          </h3>
+
+          <p>
+            ${
+              lastAction
+                ? `${lastAction.owner} · ${lastAction.date}`
+                : "Agregá una acción para verla acá."
+            }
+          </p>
+
+        </div>
+
 
       </div>
 
 
-
-      <!-- PRÓXIMA ACCIÓN -->
-
-      <div class="card">
-
-        <div class="badge">
-          PRÓXIMA ACCIÓN
-        </div>
-
-        <h3>
-          ${state.actions[state.actions.length - 1].text}
-        </h3>
-
-        <p>
-          ${state.actions[state.actions.length - 1].owner}
-          ·
-          ${state.actions[state.actions.length - 1].date}
-        </p>
-
+      <div class="big-number">
+        ✓
       </div>
 
 
-    </div>
+      <p class="badge">
+        Retro finalizada · Q3 2026
+      </p>
 
-
-    <div class="big-number">
-      ✓
-    </div>
-
-
-    <p class="badge">
-      Retro finalizada · Q3 2026
-    </p>
-
-  </section>`
+    </section>`;
+  }
 
 ];
 
@@ -712,49 +726,6 @@ async function loadRetro() {
 
 async function loadCards() {
 
-async function loadActions() {
-
-  const { data, error } =
-    await supabaseClient
-      .from("acciones")
-      .select("*")
-      .eq("retro_id", state.retroId)
-      .order("created_at", { ascending: true });
-
-  if (error) {
-
-    console.error(
-      "Error cargando acciones:",
-      error
-    );
-
-    return;
-  }
-
-  state.actions = (data || []).map(action => ({
-
-    id: action.id,
-
-    text: action.descripcion,
-
-    owner: action.responsable,
-
-    date:
-      action.fecha || "Por definir"
-
-  }));
-
-  console.log(
-    "Acciones cargadas:",
-    state.actions
-  );
-
-  if (state.step === 6 || state.step === 7) {
-    render();
-  }
-
-}
-
   const { data, error } =
     await supabaseClient
       .from("cards")
@@ -774,9 +745,55 @@ async function loadActions() {
 
   state.cards = data || [];
 
-  if (state.step === 2) {
-    render();
+  console.log(
+    "Tarjetas cargadas:",
+    state.cards
+  );
+
+}
+
+
+// =====================================================
+// CARGAR ACCIONES DESDE SUPABASE
+// =====================================================
+
+async function loadActions() {
+
+  const { data, error } =
+    await supabaseClient
+      .from("acciones")
+      .select("*")
+      .eq("retro_id", state.retroId)
+      .order("created_at", { ascending: true });
+
+  if (error) {
+
+    console.error(
+      "Error cargando acciones:",
+      error
+    );
+
+    return;
   }
+
+  state.actions =
+    (data || []).map(action => ({
+
+      id: action.id,
+
+      text: action.descripcion,
+
+      owner: action.responsable,
+
+      date:
+        action.fecha || "Por definir"
+
+    }));
+
+  console.log(
+    "Acciones cargadas:",
+    state.actions
+  );
 
 }
 
@@ -788,7 +805,10 @@ async function loadActions() {
 function subscribeToCards() {
 
   supabaseClient
-    .channel("cards-realtime-" + state.retroId)
+    .channel(
+      "cards-realtime-" +
+      state.retroId
+    )
 
     .on(
       "postgres_changes",
@@ -796,7 +816,8 @@ function subscribeToCards() {
         event: "INSERT",
         schema: "public",
         table: "cards",
-        filter: `retro_id=eq.${state.retroId}`
+        filter:
+          `retro_id=eq.${state.retroId}`
       },
 
       (payload) => {
@@ -808,7 +829,8 @@ function subscribeToCards() {
 
         const exists =
           state.cards.some(
-            card => card.id === payload.new.id
+            card =>
+              card.id === payload.new.id
           );
 
         if (!exists) {
@@ -879,7 +901,9 @@ async function bind() {
         const k =
           b.dataset.topic;
 
-        if ((state.votes[k] || 0) < 3) {
+        if (
+          (state.votes[k] || 0) < 3
+        ) {
 
           state.votes[k] =
             (state.votes[k] || 0) + 1;
@@ -956,7 +980,14 @@ async function bind() {
         data
       );
 
-      state.cards.push(data);
+      const exists =
+        state.cards.some(
+          card => card.id === data.id
+        );
+
+      if (!exists) {
+        state.cards.push(data);
+      }
 
       render();
 
@@ -984,8 +1015,14 @@ async function bind() {
           .trim();
 
       if (!t) {
+
+        alert(
+          "Escribí una acción."
+        );
+
         return;
       }
+
 
       const owner =
         document
@@ -993,6 +1030,7 @@ async function bind() {
           .value
           .trim()
         || "Por definir";
+
 
       const date =
         document
@@ -1067,17 +1105,22 @@ async function bind() {
       );
 
 
-      // Mostrar inmediatamente
-      // en la interfaz.
+      // =================================================
+      // AGREGAR AL ESTADO LOCAL
+      // =================================================
 
       state.actions.push({
 
-        text: t,
+        id: data.id,
 
-        owner: owner,
+        text:
+          data.descripcion,
+
+        owner:
+          data.responsable,
 
         date:
-          date || "Por definir"
+          data.fecha || "Por definir"
 
       });
 

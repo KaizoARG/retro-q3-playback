@@ -71,6 +71,8 @@ const state = {
   facilitatorSessionId: null,
   facilitatorName: null,
   retroStarted: false,
+  retroStartedAt: null,
+  retroFinishedAt: null,
   participants: []
 };
 
@@ -1278,6 +1280,21 @@ async function startRetro() {
   console.log("Retro iniciada:", data);
   state.retroStarted = true;
   state.step = Number(data?.step || 0);
+
+  const { data: startedData, error: startedError } = await supabaseClient.rpc(
+    "mark_retro_started",
+    {
+      p_retro_id: state.retroId,
+      p_session_id: state.participantSessionId
+    }
+  );
+
+  if (startedError) {
+    console.error("No se pudo registrar el inicio de la retro:", startedError);
+  } else if (startedData?.iniciada_en) {
+    state.retroStartedAt = startedData.iniciada_en;
+  }
+
   render();
 }
 
@@ -1401,6 +1418,22 @@ async function advanceRetro() {
 
   }
 
+  if (state.step === steps.length - 1) {
+    const { data: finishedData, error: finishedError } = await supabaseClient.rpc(
+      "mark_retro_finished",
+      {
+        p_retro_id: state.retroId,
+        p_session_id: state.participantSessionId
+      }
+    );
+
+    if (finishedError) {
+      console.error("No se pudo registrar el cierre de la retro:", finishedError);
+    } else if (finishedData?.finalizada_en) {
+      state.retroFinishedAt = finishedData.finalizada_en;
+    }
+  }
+
   render();
 }
 
@@ -1494,7 +1527,7 @@ async function refreshRetroState() {
   } = await supabaseClient
     .from("retros")
     .select(
-      "id, codigo, nombre, paso_actual, facilitador_session_id, facilitador_nombre, iniciada"
+      "id, codigo, nombre, paso_actual, facilitador_session_id, facilitador_nombre, iniciada, iniciada_en, finalizada_en"
     )
     .eq("id", state.retroId)
     .single();
@@ -1522,6 +1555,9 @@ async function refreshRetroState() {
 
   state.retroStarted =
     Boolean(data.iniciada);
+
+  state.retroStartedAt = data.iniciada_en || null;
+  state.retroFinishedAt = data.finalizada_en || null;
 
   updateFacilitatorState();
 
@@ -2800,7 +2836,19 @@ const screens = [
     const mainTopicCards =
       topTopic ? getGroupedCards(topTopic.key) : [];
 
-    const mainTopicQuestions = state.guidingQuestions || [];
+    const mainTopicQuestions = topTopic
+      ? (state.guidingQuestions || []).filter(q => !q.topicKey || q.topicKey === topTopic.key)
+      : (state.guidingQuestions || []);
+
+    const formatDuration = (start, end) => {
+      if (!start || !end) return "Tiempo total no disponible todavía";
+      const ms = Math.max(0, new Date(end).getTime() - new Date(start).getTime());
+      const totalMinutes = Math.floor(ms / 60000);
+      const hours = Math.floor(totalMinutes / 60);
+      const minutes = totalMinutes % 60;
+      if (hours > 0) return `${hours} h ${minutes} min`;
+      return `${minutes} min`;
+    };
 
     return `
       <section>
@@ -2809,82 +2857,112 @@ const screens = [
         <h2>Resumen de la actividad</h2>
 
         <p class="lead">
-          Este es el resumen de lo que observamos, las preguntas que nos hicimos
-          y las acciones que acordamos para mejorar.
+          El resumen final reúne lo que observamos, el tema que priorizamos,
+          las preguntas que nos hicimos y las acciones que acordamos.
+          El facilitador puede ajustar cualquier elemento para que el resultado final
+          represente lo que el equipo acuerda.
         </p>
 
-        <div class="card" style="margin-top:28px">
-          <div class="badge">TEMA PRINCIPAL</div>
+        <div class="card" style="margin-top:28px;display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap">
+          <div>
+            <div class="badge">TIEMPO TOTAL DE LA ACTIVIDAD</div>
+            <div style="font-size:30px;font-weight:700;margin-top:8px">
+              ${escapeHtml(formatDuration(state.retroStartedAt, state.retroFinishedAt))}
+            </div>
+            <div class="badge" style="margin-top:6px">
+              Desde el inicio de la retro hasta llegar al cierre.
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:18px">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+            <div class="badge">TEMA PRINCIPAL</div>
+            ${state.isFacilitator ? `
+              <div style="display:flex;gap:8px">
+                ${topTopic ? `<button type="button" class="summary-edit-topic" data-topic-key="${escapeHtml(topTopic.key)}" title="Modificar tema">✏️</button>
+                <button type="button" class="summary-delete-topic" data-topic-key="${escapeHtml(topTopic.key)}" title="Eliminar tema">🗑️</button>` : ""}
+                <button type="button" class="summary-add-topic" title="Agregar tema en común">+ Agregar tema</button>
+              </div>` : ""}
+          </div>
           <h3 style="font-size:24px;margin-top:12px">
-            ${
-              topTopic
-                ? `&quot;${escapeHtml(topTopic.label)}&quot;`
-                : "Todavía no hay un tema principal"
-            }
+            ${topTopic ? `&quot;${escapeHtml(topTopic.label)}&quot;` : "Todavía no hay un tema principal"}
           </h3>
           <p style="margin-top:8px">
-            ${
-              topTopic
-                ? `${state.votes[topTopic.key] || 0} votos`
-                : "No se registraron votos."
-            }
+            ${topTopic ? `${state.votes[topTopic.key] || 0} votos` : "No se registraron votos."}
           </p>
         </div>
 
         <div class="card" style="margin-top:18px">
-          <div class="badge">LO QUE APARECIÓ EN LA ACTIVIDAD</div>
-          <p style="margin-top:10px">
-            Estas son las situaciones que dieron origen al tema principal.
-          </p>
-          ${
-            mainTopicCards.length
-              ? `<div style="display:grid;gap:10px;margin-top:18px">
-                  ${mainTopicCards.map(card => `
-                    <div class="sticky">${escapeHtml(card.contenido)}</div>
-                  `).join("")}
-                </div>`
-              : `<div class="badge" style="margin-top:16px">No hay tarjetas vinculadas al tema principal.</div>`
-          }
-        </div>
-
-        <div class="card" style="margin-top:18px">
-          <div class="badge">PREGUNTAS QUE NOS HICIMOS</div>
-          <p style="margin-top:10px">
-            Preguntas que usamos para profundizar en el tema y abrir posibilidades de mejora.
-          </p>
-          ${
-            mainTopicQuestions.length
-              ? `<div style="display:grid;gap:10px;margin-top:18px">
-                  ${mainTopicQuestions.map((question, index) => `
-                    <div style="display:flex;gap:12px;align-items:flex-start;padding:14px 16px;border:1px solid rgba(255,255,255,.10);border-radius:12px">
-                      <strong>${index + 1}.</strong>
-                      <span>${escapeHtml(question.text)}</span>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+            <div>
+              <div class="badge">EVIDENCIAS · TARJETAS VINCULADAS</div>
+              <p style="margin-top:10px">Estas son las situaciones que dieron origen al tema principal.</p>
+            </div>
+            ${state.isFacilitator ? `<button type="button" class="summary-add-card">+ Agregar tarjeta</button>` : ""}
+          </div>
+          ${mainTopicCards.length
+            ? `<div style="display:grid;gap:10px;margin-top:18px">
+                ${mainTopicCards.map(card => `
+                  <div class="topic" style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
+                    <div>
+                      <div class="badge">${card.etapa === "green" ? "Funcionó" : card.etapa === "red" ? "Nos trabó" : "Aprendimos"}</div>
+                      <div style="margin-top:6px">${escapeHtml(card.contenido)}</div>
                     </div>
-                  `).join("")}
-                </div>`
-              : `<div class="badge" style="margin-top:16px">No se registraron preguntas guía.</div>`
-          }
+                    ${state.isFacilitator ? `<div style="display:flex;gap:6px;flex-shrink:0">
+                      <button type="button" class="summary-edit-card" data-card-id="${escapeHtml(card.id)}" title="Modificar tarjeta">✏️</button>
+                      <button type="button" class="summary-delete-card" data-card-id="${escapeHtml(card.id)}" title="Eliminar tarjeta">🗑️</button>
+                    </div>` : ""}
+                  </div>`).join("")}
+              </div>`
+            : `<div class="badge" style="margin-top:16px">No hay tarjetas vinculadas al tema principal.</div>`}
         </div>
 
         <div class="card" style="margin-top:18px">
-          <div class="badge">ACCIONES ACORDADAS</div>
-          <p style="margin-top:10px">
-            Las decisiones que surgieron para transformar lo conversado en mejoras concretas.
-          </p>
-          ${
-            state.actions.length
-              ? `<div style="display:grid;gap:12px;margin-top:18px">
-                  ${state.actions.map(action => `
-                    <div style="padding:14px 16px;border:1px solid rgba(255,255,255,.10);border-radius:12px">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+            <div>
+              <div class="badge">PREGUNTAS QUE NOS HICIMOS</div>
+              <p style="margin-top:10px">Preguntas que usamos para profundizar y abrir posibilidades de mejora.</p>
+            </div>
+            ${state.isFacilitator ? `<button type="button" class="summary-add-question">+ Agregar pregunta</button>` : ""}
+          </div>
+          ${mainTopicQuestions.length
+            ? `<div style="display:grid;gap:10px;margin-top:18px">
+                ${mainTopicQuestions.map((question, index) => `
+                  <div class="topic" style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
+                    <div style="display:flex;gap:12px;min-width:0"><strong>${index + 1}.</strong><span>${escapeHtml(question.text)}</span></div>
+                    ${state.isFacilitator ? `<div style="display:flex;gap:6px;flex-shrink:0">
+                      <button type="button" class="summary-edit-question" data-question-id="${escapeHtml(question.id)}" title="Modificar pregunta">✏️</button>
+                      <button type="button" class="summary-delete-question" data-question-id="${escapeHtml(question.id)}" title="Eliminar pregunta">🗑️</button>
+                    </div>` : ""}
+                  </div>`).join("")}
+              </div>`
+            : `<div class="badge" style="margin-top:16px">No se registraron preguntas guía.</div>`}
+        </div>
+
+        <div class="card" style="margin-top:18px">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+            <div>
+              <div class="badge">ACCIONES ACORDADAS</div>
+              <p style="margin-top:10px">Las decisiones que surgieron para transformar lo conversado en mejoras concretas.</p>
+            </div>
+            ${state.isFacilitator ? `<button type="button" class="summary-add-action">+ Agregar acción</button>` : ""}
+          </div>
+          ${state.actions.length
+            ? `<div style="display:grid;gap:12px;margin-top:18px">
+                ${state.actions.map(action => `
+                  <div class="topic" style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
+                    <div>
                       <strong>${escapeHtml(action.text)}</strong>
-                      <div class="badge" style="margin-top:6px">
-                        ${escapeHtml(action.owner)} · ${escapeHtml(action.date)}
-                      </div>
+                      <div class="badge" style="margin-top:6px">${escapeHtml(action.owner)} · ${escapeHtml(action.date)}</div>
                     </div>
-                  `).join("")}
-                </div>`
-              : `<div class="badge" style="margin-top:16px">Todavía no hay acciones acordadas.</div>`
-          }
+                    ${state.isFacilitator ? `<div style="display:flex;gap:6px;flex-shrink:0">
+                      <button type="button" class="summary-edit-action" data-action-id="${escapeHtml(action.id)}" title="Modificar acción">✏️</button>
+                      <button type="button" class="summary-delete-action" data-action-id="${escapeHtml(action.id)}" title="Eliminar acción">🗑️</button>
+                    </div>` : ""}
+                  </div>`).join("")}
+              </div>`
+            : `<div class="badge" style="margin-top:16px">Todavía no hay acciones acordadas.</div>`}
         </div>
 
         <div class="big-number" style="margin-top:28px">✓</div>
@@ -2905,7 +2983,7 @@ async function loadRetro() {
     await supabaseClient
       .from("retros")
       .select(
-        "id, codigo, nombre, paso_actual, facilitador_session_id, facilitador_nombre, iniciada"
+        "id, codigo, nombre, paso_actual, facilitador_session_id, facilitador_nombre, iniciada, iniciada_en, finalizada_en"
       )
       .eq("codigo", RETRO_CODE)
       .single();
@@ -2939,6 +3017,9 @@ async function loadRetro() {
 
   state.retroStarted =
     Boolean(data.iniciada);
+
+  state.retroStartedAt = data.iniciada_en || null;
+  state.retroFinishedAt = data.finalizada_en || null;
 
   updateFacilitatorState();
 
@@ -3556,6 +3637,203 @@ function subscribeToActions() {
 // =====================================================
 
 async function bind() {
+
+  // ===================================================
+  // CIERRE — EDICIÓN DEL RESUMEN
+  // ===================================================
+
+  const summaryAddTopic = document.querySelector(".summary-add-topic");
+  if (summaryAddTopic) {
+    summaryAddTopic.onclick = async () => {
+      if (!state.isFacilitator) return;
+      const label = prompt("Nombre del nuevo tema en común:");
+      const clean = String(label || "").trim();
+      if (!clean) return;
+      const { data, error } = await supabaseClient.rpc("create_topic", {
+        p_retro_id: state.retroId,
+        p_session_id: state.participantSessionId,
+        p_topic_key: topicKeyFromLabel(clean),
+        p_label: clean
+      });
+      if (error) return alert("No se pudo agregar el tema.\n\n" + error.message);
+      if (!data?.success) return alert(data?.message || "No se pudo agregar el tema.");
+      await loadTopics();
+      render();
+    };
+  }
+
+  document.querySelectorAll(".summary-edit-topic").forEach(button => {
+    button.onclick = async () => {
+      const topic = getDynamicTopics().find(item => item.key === button.dataset.topicKey);
+      if (!topic || !state.isFacilitator) return;
+      const value = prompt("Modificar tema en común:", topic.label);
+      const clean = String(value || "").trim();
+      if (!clean || clean === topic.label) return;
+      const { data, error } = await supabaseClient.rpc("rename_topic", {
+        p_retro_id: state.retroId, p_session_id: state.participantSessionId,
+        p_topic_key: topic.key, p_label: clean
+      });
+      if (error || !data?.success) return alert("No se pudo modificar el tema.\n\n" + (error?.message || data?.message || "Error"));
+      await loadTopics(); render();
+    };
+  });
+
+  document.querySelectorAll(".summary-delete-topic").forEach(button => {
+    button.onclick = async () => {
+      const topic = getDynamicTopics().find(item => item.key === button.dataset.topicKey);
+      if (!topic || !state.isFacilitator) return;
+      if (!confirm(`¿Eliminar el tema en común "${topic.label}"?\n\nLas tarjetas quedarán sin agrupar.`)) return;
+      const { data, error } = await supabaseClient.rpc("delete_topic", {
+        p_retro_id: state.retroId, p_session_id: state.participantSessionId, p_topic_key: topic.key
+      });
+      if (error || !data?.success) return alert("No se pudo eliminar el tema.\n\n" + (error?.message || data?.message || "Error"));
+      await loadTopics(); await loadCards(); await loadVotes(); render();
+    };
+  });
+
+  const summaryAddCard = document.querySelector(".summary-add-card");
+  if (summaryAddCard) {
+    summaryAddCard.onclick = async () => {
+      if (!state.isFacilitator) return;
+      const text = prompt("Texto de la nueva tarjeta:");
+      const clean = String(text || "").trim();
+      if (!clean) return;
+      const type = prompt("Tipo de tarjeta: funcionó / nos trabó / aprendimos", "nos trabó") || "nos trabó";
+      const etapa = normalizeTopicText(type).includes("func") ? "green" : normalizeTopicText(type).includes("aprend") ? "blue" : "red";
+      const topTopic = getTopVotedTopic();
+      const { data, error } = await supabaseClient.rpc("create_summary_card", {
+        p_retro_id: state.retroId, p_session_id: state.participantSessionId,
+        p_contenido: clean, p_etapa: etapa, p_topic_key: topTopic?.key || null
+      });
+      if (error || !data?.success) return alert("No se pudo agregar la tarjeta.\n\n" + (error?.message || data?.message || "Error"));
+      await loadCards(); render();
+    };
+  }
+
+  document.querySelectorAll(".summary-edit-card").forEach(button => {
+    button.onclick = async () => {
+      if (!state.isFacilitator) return;
+      const card = state.cards.find(item => item.id === button.dataset.cardId);
+      if (!card) return;
+      const value = prompt("Modificar tarjeta:", card.contenido);
+      const clean = String(value || "").trim();
+      if (!clean || clean === card.contenido) return;
+      const { data, error } = await supabaseClient.rpc("update_summary_card", {
+        p_retro_id: state.retroId, p_session_id: state.participantSessionId,
+        p_card_id: card.id, p_contenido: clean
+      });
+      if (error || !data?.success) return alert("No se pudo modificar la tarjeta.\n\n" + (error?.message || data?.message || "Error"));
+      await loadCards(); render();
+    };
+  });
+
+  document.querySelectorAll(".summary-delete-card").forEach(button => {
+    button.onclick = async () => {
+      if (!state.isFacilitator) return;
+      const card = state.cards.find(item => item.id === button.dataset.cardId);
+      if (!card) return;
+      if (!confirm(`¿Eliminar esta tarjeta?\n\n${card.contenido}`)) return;
+      const { data, error } = await supabaseClient.rpc("delete_summary_card", {
+        p_retro_id: state.retroId, p_session_id: state.participantSessionId, p_card_id: card.id
+      });
+      if (error || !data?.success) return alert("No se pudo eliminar la tarjeta.\n\n" + (error?.message || data?.message || "Error"));
+      await loadCards(); render();
+    };
+  });
+
+  const summaryAddQuestion = document.querySelector(".summary-add-question");
+  if (summaryAddQuestion) summaryAddQuestion.onclick = async () => {
+    if (!state.isFacilitator) return;
+    const value = prompt("Nueva pregunta guía:");
+    const clean = String(value || "").trim();
+    if (!clean) return;
+    if (questionExists(clean)) return alert("Esa pregunta ya fue agregada.");
+    const topTopic = getTopVotedTopic();
+    const { data, error } = await supabaseClient.rpc("create_guiding_question", {
+      p_retro_id: state.retroId, p_session_id: state.participantSessionId,
+      p_topic_key: topTopic?.key || null, p_pregunta: clean, p_origen: "manual"
+    });
+    if (error || !data?.success) return alert("No se pudo agregar la pregunta.\n\n" + (error?.message || data?.message || "Error"));
+    await loadGuidingQuestions(); render();
+  };
+
+  document.querySelectorAll(".summary-edit-question").forEach(button => {
+    button.onclick = async () => {
+      const q = state.guidingQuestions.find(item => item.id === button.dataset.questionId);
+      if (!q || !state.isFacilitator) return;
+      const value = prompt("Modificar pregunta guía:", q.text);
+      const clean = String(value || "").trim();
+      if (!clean || clean === q.text) return;
+      const { data, error } = await supabaseClient.rpc("update_guiding_question", {
+        p_retro_id: state.retroId, p_session_id: state.participantSessionId,
+        p_question_id: q.id, p_pregunta: clean
+      });
+      if (error || !data?.success) return alert("No se pudo modificar la pregunta.\n\n" + (error?.message || data?.message || "Error"));
+      await loadGuidingQuestions(); render();
+    };
+  });
+
+  document.querySelectorAll(".summary-delete-question").forEach(button => {
+    button.onclick = async () => {
+      const q = state.guidingQuestions.find(item => item.id === button.dataset.questionId);
+      if (!q || !state.isFacilitator) return;
+      if (!confirm(`¿Eliminar esta pregunta?\n\n${q.text}`)) return;
+      const { data, error } = await supabaseClient.rpc("delete_guiding_question", {
+        p_retro_id: state.retroId, p_session_id: state.participantSessionId, p_question_id: q.id
+      });
+      if (error || !data?.success) return alert("No se pudo eliminar la pregunta.\n\n" + (error?.message || data?.message || "Error"));
+      await loadGuidingQuestions(); render();
+    };
+  });
+
+  const summaryAddAction = document.querySelector(".summary-add-action");
+  if (summaryAddAction) summaryAddAction.onclick = () => {
+    const text = prompt("¿Qué vamos a hacer?");
+    const clean = String(text || "").trim();
+    if (!clean) return;
+    const owner = prompt("Responsable:", "Por definir") || "Por definir";
+    const date = prompt("Fecha (AAAA-MM-DD, opcional):", "") || null;
+    (async () => {
+      const { data, error } = await supabaseClient.rpc("create_summary_action", {
+        p_retro_id: state.retroId, p_session_id: state.participantSessionId,
+        p_descripcion: clean, p_responsable: owner.trim() || "Por definir", p_fecha: date || null
+      });
+      if (error || !data?.success) return alert("No se pudo agregar la acción.\n\n" + (error?.message || data?.message || "Error"));
+      await loadActions(); render();
+    })();
+  };
+
+  document.querySelectorAll(".summary-edit-action").forEach(button => {
+    button.onclick = async () => {
+      const action = state.actions.find(item => item.id === button.dataset.actionId);
+      if (!action || !state.isFacilitator) return;
+      const text = prompt("Modificar acción:", action.text);
+      const clean = String(text || "").trim();
+      if (!clean) return;
+      const owner = prompt("Responsable:", action.owner || "Por definir");
+      const date = prompt("Fecha (AAAA-MM-DD, opcional):", action.date === "Por definir" ? "" : action.date) || null;
+      const { data, error } = await supabaseClient.rpc("update_action", {
+        p_retro_id: state.retroId, p_session_id: state.participantSessionId,
+        p_action_id: action.id, p_descripcion: clean, p_responsable: String(owner || "Por definir").trim() || "Por definir", p_fecha: date || null
+      });
+      if (error || !data?.success) return alert("No se pudo modificar la acción.\n\n" + (error?.message || data?.message || "Error"));
+      await loadActions(); render();
+    };
+  });
+
+  document.querySelectorAll(".summary-delete-action").forEach(button => {
+    button.onclick = async () => {
+      const action = state.actions.find(item => item.id === button.dataset.actionId);
+      if (!action || !state.isFacilitator) return;
+      if (!confirm(`¿Eliminar esta acción?\n\n${action.text}`)) return;
+      const { data, error } = await supabaseClient.rpc("delete_action", {
+        p_retro_id: state.retroId, p_session_id: state.participantSessionId, p_action_id: action.id
+      });
+      if (error || !data?.success) return alert("No se pudo eliminar la acción.\n\n" + (error?.message || data?.message || "Error"));
+      await loadActions(); render();
+    };
+  });
+
 
 
   // ===================================================

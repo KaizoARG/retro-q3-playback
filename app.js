@@ -3231,17 +3231,17 @@ function landingHome() {
 
 function landingRetroRow(retro) {
   const teams = escapeHtml(retro.equipos || retro.nombre || "Equipos no definidos");
+  const date = escapeHtml(formatLandingDate(retro.fecha));
   const status = retro.finalizada_en ? "Finalizada" : "En preparación";
   return `
     <div style="display:flex;justify-content:space-between;align-items:center;gap:18px;padding:18px 0;border-bottom:1px solid rgba(255,255,255,.08);flex-wrap:wrap">
       <div style="min-width:260px;flex:1">
-        <div style="font-size:18px;font-weight:700">${teams}</div>
-        <div style="opacity:.65;margin-top:5px">${formatLandingDate(retro.fecha)} · ${status} · Código ${escapeHtml(retro.codigo)}</div>
+        <div style="font-size:18px;font-weight:700">${teams} · ${date}</div>
+        <div style="opacity:.65;margin-top:5px">${status}</div>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="landing-summary-btn" data-retro-id="${retro.id}" style="padding:9px 13px">Ver resumen</button>
         <button class="landing-feedback-btn" data-retro-id="${retro.id}" style="padding:9px 13px">Ver feedback</button>
-        <button class="landing-enter-btn primary" data-code="${escapeHtml(retro.codigo)}" style="padding:9px 13px">Acceder</button>
       </div>
     </div>
   `;
@@ -3342,10 +3342,6 @@ function bindLanding() {
 
   const newBtn = document.querySelector("#newRetroBtn");
   if (newBtn) newBtn.onclick = () => { landingView = "create"; renderLanding(); };
-
-  document.querySelectorAll(".landing-enter-btn").forEach(btn => {
-    btn.onclick = () => { window.location.href = `?retro=${encodeURIComponent(btn.dataset.code)}`; };
-  });
 
   document.querySelectorAll(".landing-summary-btn").forEach(btn => {
     btn.onclick = async () => {

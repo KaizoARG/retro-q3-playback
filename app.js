@@ -16,7 +16,11 @@ const urlParams = new URLSearchParams(window.location.search);
 const RETRO_CODE =
   urlParams.get("retro") || null;
 
+const RETRO_ID_PARAM =
+  urlParams.get("retro_id") || null;
+
 console.log("Código de retro:", RETRO_CODE);
+console.log("ID de retro:", RETRO_ID_PARAM);
 
 
 // =====================================================
@@ -3232,7 +3236,12 @@ function landingHome() {
 function landingRetroRow(retro) {
   const teams = escapeHtml(retro.equipos || retro.nombre || "Equipos no definidos");
   const date = escapeHtml(formatLandingDate(retro.fecha));
-  const status = retro.finalizada_en ? "Finalizada" : "En preparación";
+  const isFinished = Boolean(retro.finalizada_en);
+  const status = isFinished
+    ? "Finalizada"
+    : (retro.iniciada ? "En progreso" : "Pendiente de inicio");
+  const retroId = escapeHtml(retro.id || "");
+
   return `
     <div style="display:flex;justify-content:space-between;align-items:center;gap:18px;padding:18px 0;border-bottom:1px solid rgba(255,255,255,.08);flex-wrap:wrap">
       <div style="min-width:260px;flex:1">
@@ -3240,8 +3249,25 @@ function landingRetroRow(retro) {
         <div style="opacity:.65;margin-top:5px">${status}</div>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button class="landing-summary-btn" data-retro-id="${retro.id}" style="padding:9px 13px">Ver resumen</button>
-        <button class="landing-feedback-btn" data-retro-id="${retro.id}" style="padding:9px 13px">Ver feedback</button>
+        <button
+          class="landing-summary-btn${isFinished ? "" : " landing-history-disabled"}"
+          data-retro-id="${retro.id}"
+          ${isFinished ? "" : "disabled"}
+          style="padding:9px 13px"
+        >Ver resumen</button>
+        <button
+          class="landing-feedback-btn${isFinished ? "" : " landing-history-disabled"}"
+          data-retro-id="${retro.id}"
+          ${isFinished ? "" : "disabled"}
+          style="padding:9px 13px"
+        >Ver feedback</button>
+        ${!isFinished && retroId ? `
+          <button
+            class="landing-join-btn primary"
+            data-retro-id="${retroId}"
+            style="padding:9px 13px"
+          >Unirme a la retro →</button>
+        ` : ""}
       </div>
     </div>
   `;
@@ -3357,6 +3383,7 @@ function bindLanding() {
 
   document.querySelectorAll(".landing-feedback-btn").forEach(btn => {
     btn.onclick = async () => {
+      if (btn.disabled) return;
       btn.disabled = true;
       const { data, error } = await supabaseClient.rpc("get_retro_feedback_summary", { p_retro_id: btn.dataset.retroId });
       btn.disabled = false;
@@ -3364,6 +3391,21 @@ function bindLanding() {
       landingSelectedRetro = data;
       landingView = "feedback";
       renderLanding();
+    };
+  });
+
+  document.querySelectorAll(".landing-join-btn").forEach(btn => {
+    btn.onclick = () => {
+      const retroId = btn.dataset.retroId;
+      if (!retroId) return;
+
+      const name = window.prompt("Ingresá tu nombre y apellido para unirte a la retro:");
+      const cleanName = String(name || "").trim();
+
+      if (!cleanName) return;
+
+      sessionStorage.setItem(`retro-join-name-${retroId}`, cleanName);
+      window.location.href = `?retro_id=${encodeURIComponent(retroId)}`;
     };
   });
 
@@ -3559,14 +3601,19 @@ async function initializeLanding() {
 
 async function loadRetro() {
 
-  const { data, error } =
-    await supabaseClient
-      .from("retros")
-      .select(
-        "id, codigo, nombre, paso_actual, facilitador_session_id, facilitador_nombre, iniciada, iniciada_en, finalizada_en"
-      )
-      .eq("codigo", RETRO_CODE)
-      .single();
+  let retroQuery = supabaseClient
+    .from("retros")
+    .select(
+      "id, codigo, nombre, paso_actual, facilitador_session_id, facilitador_nombre, iniciada, iniciada_en, finalizada_en"
+    );
+
+  if (RETRO_ID_PARAM) {
+    retroQuery = retroQuery.eq("id", RETRO_ID_PARAM);
+  } else {
+    retroQuery = retroQuery.eq("codigo", RETRO_CODE);
+  }
+
+  const { data, error } = await retroQuery.single();
 
   if (error) {
 
@@ -5811,7 +5858,7 @@ async function initialize() {
     return;
   }
 
-  if (!RETRO_CODE) {
+  if (!RETRO_CODE && !RETRO_ID_PARAM) {
     await initializeLanding();
     return;
   }
@@ -5849,6 +5896,23 @@ async function initialize() {
     );
 
     return;
+  }
+
+
+  // Si llegamos desde el historial mediante “Unirme a la retro”,
+  // el nombre se solicitó antes de entrar y queda pendiente en sessionStorage.
+  const pendingJoinNameKey = RETRO_ID_PARAM
+    ? `retro-join-name-${RETRO_ID_PARAM}`
+    : null;
+  const pendingJoinName = pendingJoinNameKey
+    ? sessionStorage.getItem(pendingJoinNameKey)
+    : null;
+
+  if (pendingJoinName) {
+    const saved = await setParticipantProfile(pendingJoinName, false);
+    if (saved) {
+      sessionStorage.removeItem(pendingJoinNameKey);
+    }
   }
 
 

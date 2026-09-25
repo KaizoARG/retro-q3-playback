@@ -968,18 +968,19 @@ if (addCard) {
        * porque todavía no implementamos las salas.
        */
 
-      const { data, error } =
-        await supabaseClient
-          .from("acciones")
-          .insert({
+	const { data, error } =
+	  await supabaseClient
+		.from("acciones")
+		.insert({
 
-            descripcion: t,
-            responsable: owner,
-            fecha: date
+		  descripcion: t,
+		  responsable: owner,
+		  fecha: date,
+		  retro_id: state.retroId
 
-          })
-          .select()
-          .single();
+		})
+		.select()
+		.single();
 
 
       if (error) {

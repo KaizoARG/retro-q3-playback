@@ -12,7 +12,7 @@ button,input,textarea { font:inherit; }
 .topbar { height:72px; display:flex; align-items:center; gap:28px; padding:0 5vw; border-bottom:1px solid var(--line); }
 .brand { font-weight:800; letter-spacing:.12em; }
 .brand-dot { display:inline-block; width:9px; height:9px; border-radius:50%; background:white; margin-right:8px; }
-.session { color:var(--muted); font-size:12px; letter-spacing:.1em; }
+.session { color:var(--muted); font-size:16px; letter-spacing:.1em; }
 .progress { margin-left:auto; width:180px; height:4px; background:#20232b; border-radius:99px; overflow:hidden; }
 .progress span { display:block; height:100%; width:12.5%; background:white; transition:.35s; }
 main { width:min(1120px,90vw); margin:auto; padding:20px 0 110px; flex:1; }

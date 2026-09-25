@@ -73,24 +73,231 @@ const state = {
 
 const MAX_VOTES_PER_PARTICIPANT = 3;
 
-const voteTopics = [
-  {
-    key: "dependencias",
-    label: "Dependencias entre equipos"
-  },
-  {
-    key: "calidad",
-    label: "Calidad y UAT"
-  },
-  {
-    key: "priorizacion",
-    label: "Priorización y foco"
-  },
-  {
-    key: "metricas",
-    label: "Visibilidad de métricas"
+const TOPIC_STOP_WORDS = new Set([
+  "para", "como", "pero", "porque", "cuando", "donde", "desde", "hasta",
+  "entre", "sobre", "ante", "hacia", "segun", "tambien", "muy", "mas",
+  "menos", "todo", "toda", "todos", "todas", "algo", "nada", "esto",
+  "esta", "este", "estas", "estos", "que", "del", "las", "los", "una",
+  "uno", "unos", "unas", "con", "sin", "por", "una", "hay", "fue",
+  "ser", "son", "era", "eran", "nos", "nosotros", "nuestro", "nuestra",
+  "muy", "ya", "se", "su", "sus", "al", "el", "la", "y", "o", "a",
+  "en", "de", "un", "es", "me", "te", "le", "lo", "mi", "tu", "para"
+]);
+
+
+function normalizeTopicText(value) {
+  return String(value || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+
+function getMeaningfulTokens(value) {
+  return normalizeTopicText(value)
+    .split(" ")
+    .map(token => token.trim())
+    .filter(token =>
+      token.length >= 4 &&
+      !TOPIC_STOP_WORDS.has(token) &&
+      !/^\d+$/.test(token)
+    );
+}
+
+
+function topicKeyFromLabel(label) {
+  return String(label || "")
+    .trim()
+    .slice(0, 120);
+}
+
+
+function titleCaseTopic(label) {
+  return String(label || "")
+    .split(" ")
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
+
+function getDynamicTopics() {
+  const grouped = new Map();
+
+  state.cards
+    .filter(card => card.topic_key)
+    .forEach(card => {
+      const key = card.topic_key;
+
+      if (!grouped.has(key)) {
+        grouped.set(key, {
+          key,
+          label: key,
+          count: 0
+        });
+      }
+
+      grouped.get(key).count += 1;
+    });
+
+  return Array.from(grouped.values())
+    .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
+}
+
+
+function getTopicLabel(topicKey) {
+  if (!topicKey) return "Sin agrupar";
+
+  const topic = getDynamicTopics()
+    .find(topic => topic.key === topicKey);
+
+  return topic ? topic.label : topicKey;
+}
+
+
+function getTopicCount(topicKey) {
+  return state.cards.filter(
+    card => card.topic_key === topicKey
+  ).length;
+}
+
+
+function getGroupedCards(topicKey) {
+  return state.cards.filter(
+    card => card.topic_key === topicKey
+  );
+}
+
+
+function buildDynamicTopics(cards) {
+  const prepared = cards.map(card => ({
+    card,
+    tokens: new Set(getMeaningfulTokens(card.contenido))
+  }));
+
+  const frequencies = new Map();
+
+  prepared.forEach(item => {
+    item.tokens.forEach(token => {
+      frequencies.set(token, (frequencies.get(token) || 0) + 1);
+    });
+  });
+
+  const candidateTokens = Array.from(frequencies.entries())
+    .filter(([, count]) => count >= 2)
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+
+  const candidates = [];
+  const usedTokens = new Set();
+
+  candidateTokens.forEach(([token, count]) => {
+    if (candidates.length >= 6 || usedTokens.has(token)) return;
+
+    const matching = prepared.filter(item => item.tokens.has(token));
+
+    if (matching.length < 2) return;
+
+    const related = Array.from(
+      new Set(
+        matching.flatMap(item => Array.from(item.tokens))
+      )
+    )
+      .filter(other => other !== token && (frequencies.get(other) || 0) >= 2)
+      .sort((a, b) =>
+        ((frequencies.get(b) || 0) - (frequencies.get(a) || 0)) ||
+        a.localeCompare(b)
+      );
+
+    const second = related.find(other => !usedTokens.has(other));
+    const label = second
+      ? `${titleCaseTopic(token)} · ${titleCaseTopic(second)}`
+      : titleCaseTopic(token);
+
+    candidates.push({
+      token,
+      label,
+      cards: matching
+    });
+
+    usedTokens.add(token);
+    if (second) usedTokens.add(second);
+  });
+
+  // Fallback: si no hay palabras repetidas, buscar pequeños grupos por similitud.
+  if (candidates.length === 0) {
+    const unused = new Set(prepared.map(item => item.card.id));
+
+    while (unused.size >= 2 && candidates.length < 6) {
+      const seedId = unused.values().next().value;
+      const seed = prepared.find(item => item.card.id === seedId);
+
+      if (!seed) break;
+
+      const matches = prepared.filter(item => {
+        if (!unused.has(item.card.id) || item.card.id === seedId) return false;
+        const intersection = Array.from(seed.tokens)
+          .filter(token => item.tokens.has(token)).length;
+        const union = new Set([
+          ...seed.tokens,
+          ...item.tokens
+        ]).size;
+        return union > 0 && intersection / union >= 0.25;
+      });
+
+      if (matches.length === 0) {
+        unused.delete(seedId);
+        continue;
+      }
+
+      const topicCards = [seed, ...matches];
+      const topicFrequency = new Map();
+      topicCards.forEach(item => item.tokens.forEach(token => {
+        topicFrequency.set(token, (topicFrequency.get(token) || 0) + 1);
+      }));
+
+      const words = Array.from(topicFrequency.entries())
+        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+        .slice(0, 2)
+        .map(([token]) => titleCaseTopic(token));
+
+      candidates.push({
+        token: words[0] || "Tema",
+        label: words.join(" · ") || "Tema",
+        cards: topicCards
+      });
+
+      topicCards.forEach(item => unused.delete(item.card.id));
+    }
   }
-];
+
+  const assignments = new Map();
+
+  candidates.forEach(candidate => {
+    const key = topicKeyFromLabel(candidate.label);
+
+    candidate.cards.forEach(item => {
+      const existing = assignments.get(item.card.id);
+      if (!existing || candidate.cards.length > existing.count) {
+        assignments.set(item.card.id, {
+          key,
+          label: candidate.label,
+          count: candidate.cards.length
+        });
+      }
+    });
+  });
+
+  return {
+    candidates: candidates.map(candidate => ({
+      key: topicKeyFromLabel(candidate.label),
+      label: candidate.label
+    })),
+    assignments
+  };
+}
+
 
 const steps = [
   "Inicio",
@@ -123,13 +330,7 @@ function escapeHtml(value) {
 
 
 function getTopicLabel(topicKey) {
-  const topic = voteTopics.find(
-    topic => topic.key === topicKey
-  );
-
-  return topic
-    ? topic.label
-    : "Sin agrupar";
+  return topicKey || "Sin agrupar";
 }
 
 
@@ -1875,10 +2076,10 @@ const screens = [
 
   () => {
 
+    const dynamicTopics = getDynamicTopics();
+
     const ungroupedCards =
-      state.cards.filter(
-        card => !card.topic_key
-      );
+      state.cards.filter(card => !card.topic_key);
 
     return `
       <section>
@@ -1888,68 +2089,75 @@ const screens = [
         </div>
 
         <h2>
-          ¿Qué temas aparecen varias veces?
+          ¿Qué temas aparecen en la cosecha?
         </h2>
 
         <p class="lead">
-          Agrupá las tarjetas según el tema al que hacen referencia.
-          El resultado se actualiza para todos los participantes.
+          Los tópicos se generan a partir de lo que escribió el equipo.
+          No hay categorías predefinidas.
         </p>
 
+        ${
+          state.isFacilitator
+            ? `
+              <div class="card" style="margin-top:30px">
+                <h3>Generar agrupación automática</h3>
+                <p>
+                  El sistema analiza las tarjetas de la cosecha, detecta temas repetidos y propone tópicos dinámicos.
+                </p>
+                <button
+                  class="primary"
+                  id="generateTopicsBtn"
+                  style="margin-top:12px">
+                  ${dynamicTopics.length ? "Regenerar tópicos" : "Generar tópicos"}
+                </button>
+              </div>
+            `
+            : `
+              <div class="card" style="margin-top:30px">
+                <p>
+                  El facilitador está generando los tópicos a partir de la cosecha.
+                </p>
+              </div>
+            `
+        }
 
-        <div
-          class="topic-list"
-          style="margin-top:30px">
-
-          ${voteTopics
-            .map(topic => {
-
-              const count =
-                getTopicCount(topic.key);
-
-              return `
-                <div class="topic">
-
-                  <strong>
-                    ${topic.label}
-                  </strong>
-
-                  <span class="badge">
-                    ${count}
-                    tarjeta${count === 1 ? "" : "s"}
-                  </span>
-
+        <div class="topic-list" style="margin-top:30px">
+          ${
+            dynamicTopics.length
+              ? dynamicTopics.map(topic => `
+                  <div class="topic">
+                    <strong>${escapeHtml(topic.label)}</strong>
+                    <span class="badge">
+                      ${topic.count}
+                      tarjeta${topic.count === 1 ? "" : "s"}
+                    </span>
+                  </div>
+                `).join("")
+              : `
+                <div class="card">
+                  <p>
+                    Todavía no hay tópicos generados.
+                  </p>
                 </div>
-              `;
-
-            })
-            .join("")}
-
+              `
+          }
         </div>
 
-
         ${
-          ungroupedCards.length > 0
+          ungroupedCards.length
             ? `
-              <div
-                class="card"
-                style="margin-top:30px">
-
-                <h3>
-                  Tarjetas pendientes de agrupar
-                </h3>
-
+              <div class="card" style="margin-top:30px">
+                <h3>Tarjetas sin agrupar</h3>
                 <p>
-                  Hay ${ungroupedCards.length}
+                  ${ungroupedCards.length}
                   tarjeta${ungroupedCards.length === 1 ? "" : "s"}
-                  que todavía no tienen un tema asignado.
+                  no encontró un tema suficientemente claro.
                 </p>
-
               </div>
             `
             : ""
         }
-
 
         <div
           style="
@@ -1967,82 +2175,48 @@ const screens = [
                   </p>
                 </div>
               `
-              : state.cards
-                  .map(card => `
-                    <div
-                      class="card"
-                      style="
-                        display:flex;
-                        gap:20px;
-                        align-items:center;
-                        justify-content:space-between;
-                        flex-wrap:wrap;
-                      ">
+              : state.cards.map(card => `
+                <div
+                  class="card"
+                  style="
+                    display:flex;
+                    gap:20px;
+                    align-items:center;
+                    justify-content:space-between;
+                    flex-wrap:wrap;
+                  ">
 
-                      <div
-                        style="
-                          flex:1;
-                          min-width:250px;
-                        ">
-
-                        <div
-                          class="badge"
-                          style="margin-bottom:10px">
-
-                          ${
-                            card.etapa === "green"
-                              ? "Funcionó"
-                              : card.etapa === "red"
-                                ? "Nos trabó"
-                                : "Aprendimos"
-                          }
-
-                        </div>
-
-                        <strong>
-                          ${escapeHtml(card.contenido)}
-                        </strong>
-
-                      </div>
-
-
-                      <div
-                        style="
-                          min-width:250px;
-                        ">
-
-                        <select
-                          class="card-topic-select"
-                          data-card-id="${card.id}"
-                          style="width:100%;">
-
-                          <option value="">
-                            Sin agrupar
-                          </option>
-
-                          ${voteTopics
-                            .map(topic => `
-                              <option
-                                value="${topic.key}"
-                                ${
-                                  card.topic_key === topic.key
-                                    ? "selected"
-                                    : ""
-                                }>
-
-                                ${topic.label}
-
-                              </option>
-                            `)
-                            .join("")}
-
-                        </select>
-
-                      </div>
-
+                  <div style="flex:1;min-width:250px;">
+                    <div class="badge" style="margin-bottom:10px">
+                      ${
+                        card.etapa === "green"
+                          ? "Funcionó"
+                          : card.etapa === "red"
+                            ? "Nos trabó"
+                            : "Aprendimos"
+                      }
                     </div>
-                  `)
-                  .join("")
+                    <strong>${escapeHtml(card.contenido)}</strong>
+                  </div>
+
+                  <div style="min-width:250px;">
+                    <select
+                      class="card-topic-select"
+                      data-card-id="${card.id}"
+                      style="width:100%;">
+                      <option value="">Sin agrupar</option>
+                      ${dynamicTopics.map(topic => `
+                        <option
+                          value="${escapeHtml(topic.key)}"
+                          ${card.topic_key === topic.key ? "selected" : ""}>
+                          ${escapeHtml(topic.label)}
+                        </option>
+                      `).join("")}
+                    </select>
+                  </div>
+
+                </div>
+              `).join("")
           }
 
         </div>
@@ -2096,7 +2270,7 @@ const screens = [
 
         <div class="topic-list">
 
-          ${voteTopics
+          ${getDynamicTopics()
             .map(topic => {
 
               const totalVotes =
@@ -2176,7 +2350,7 @@ const screens = [
   () => {
 
     const topTopic =
-      voteTopics
+      getDynamicTopics()
         .slice()
         .sort(
           (a, b) =>
@@ -2385,7 +2559,7 @@ const screens = [
         : null;
 
     const topTopic =
-      voteTopics
+      getDynamicTopics()
         .slice()
         .sort(
           (a, b) =>
@@ -3203,6 +3377,52 @@ async function bind() {
   // ===================================================
   // AGRUPACIÓN
   // ===================================================
+
+  const generateTopicsBtn =
+    document.querySelector("#generateTopicsBtn");
+
+  if (generateTopicsBtn) {
+    generateTopicsBtn.onclick = async () => {
+      if (!state.isFacilitator) return;
+
+      if (!state.cards.length) {
+        alert("Todavía no hay tarjetas para agrupar.");
+        return;
+      }
+
+      generateTopicsBtn.disabled = true;
+      generateTopicsBtn.textContent = "Generando…";
+
+      const { assignments } = buildDynamicTopics(state.cards);
+
+      const updates = state.cards.map(card => ({
+        id: card.id,
+        topic_key: assignments.get(card.id)?.key || null
+      }));
+
+      try {
+        for (const update of updates) {
+          const { error } = await supabaseClient
+            .from("cards")
+            .update({ topic_key: update.topic_key })
+            .eq("id", update.id);
+
+          if (error) throw error;
+        }
+
+        await loadCards();
+        render();
+      } catch (error) {
+        console.error("Error generando tópicos:", error);
+        alert(
+          "No se pudo generar la agrupación.\n\n" +
+          error.message
+        );
+        generateTopicsBtn.disabled = false;
+        generateTopicsBtn.textContent = "Generar tópicos";
+      }
+    };
+  }
 
   document
     .querySelectorAll(".card-topic-select")

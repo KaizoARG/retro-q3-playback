@@ -706,6 +706,67 @@ async function confirmClaimFacilitator() {
 // FACILITADOR - LIBERAR CONTROL
 // =====================================================
 
+// =====================================================
+// FACILITADOR - REINICIAR SALA
+// =====================================================
+
+async function resetRetro() {
+
+  if (!state.retroId || !state.participantSessionId) {
+    return;
+  }
+
+  const confirmed = window.confirm(
+    "¿Reiniciar la sala?\n\n" +
+    "Se van a borrar todas las tarjetas de cosecha, agrupaciones, votos y acciones.\n" +
+    "Los nombres de los participantes se conservarán, pero todos quedarán como pendientes.\n\n" +
+    "Esta acción no se puede deshacer."
+  );
+
+  if (!confirmed) {
+    return;
+  }
+
+  const { data, error } = await supabaseClient.rpc(
+    "reset_retro",
+    {
+      p_retro_id: state.retroId,
+      p_session_id: state.participantSessionId
+    }
+  );
+
+  if (error) {
+    console.error("Error reiniciando la sala:", error);
+    alert(
+      "No se pudo reiniciar la sala.\n\n" +
+      error.message
+    );
+    return;
+  }
+
+  console.log("Sala reiniciada:", data);
+
+  state.step = 0;
+  state.retroStarted = false;
+  state.votes = {};
+  state.myVotes = {};
+  state.usedVotes = 0;
+  state.cards = [];
+  state.actions = [];
+  state.facilitatorSessionId = null;
+  state.facilitatorName = null;
+  state.isFacilitator = false;
+
+  localStorage.removeItem(
+    `retro-my-votes-${state.retroId}`
+  );
+
+  await loadParticipants();
+  await refreshRetroState();
+  render();
+}
+
+
 async function releaseFacilitator() {
 
   if (
@@ -1063,18 +1124,36 @@ function facilitatorControls() {
           </div>
         </div>
 
-        <button
-          id="releaseFacilitatorBtn"
-          style="
-            padding:9px 14px;
-            border-radius:10px;
-            cursor:pointer;
-            background:transparent;
-            border:1px solid currentColor;
-          "
-        >
-          Liberar control
-        </button>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+
+          <button
+            id="resetRetroBtn"
+            style="
+              padding:9px 14px;
+              border-radius:10px;
+              cursor:pointer;
+              background:transparent;
+              border:1px solid rgba(255,120,120,.5);
+              color:inherit;
+            "
+          >
+            Reiniciar sala
+          </button>
+
+          <button
+            id="releaseFacilitatorBtn"
+            style="
+              padding:9px 14px;
+              border-radius:10px;
+              cursor:pointer;
+              background:transparent;
+              border:1px solid currentColor;
+            "
+          >
+            Liberar control
+          </button>
+
+        </div>
 
       </div>
     `;
@@ -2873,6 +2952,33 @@ async function bind() {
 
       closeFacilitatorConfirmation();
 
+    };
+
+  }
+
+
+  // ===================================================
+  // FACILITADOR - REINICIAR SALA
+  // ===================================================
+
+  const resetButton =
+    document.querySelector(
+      "#resetRetroBtn"
+    );
+
+  if (resetButton) {
+
+    resetButton.onclick = async () => {
+
+      resetButton.disabled = true;
+      resetButton.textContent = "Reiniciando...";
+
+      await resetRetro();
+
+      if (document.body.contains(resetButton)) {
+        resetButton.disabled = false;
+        resetButton.textContent = "Reiniciar sala";
+      }
     };
 
   }

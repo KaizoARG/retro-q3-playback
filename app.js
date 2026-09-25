@@ -372,6 +372,15 @@ async function setParticipantProfile(nombre, listo) {
     return false;
   }
 
+  // Si el participante fue eliminado por un reinicio de sala,
+  // recreamos la sesión antes de guardar el perfil.
+  if (!state.participantId) {
+    const recreated = await loadParticipant();
+    if (!recreated || !state.participantId) {
+      return false;
+    }
+  }
+
   const cleanName = String(nombre || "").trim();
 
   if (!cleanName) {
@@ -803,8 +812,14 @@ async function resetRetro() {
     `retro-my-votes-${state.retroId}`
   );
 
-  await loadParticipants();
   await refreshRetroState();
+
+  // El reset elimina también al participante actual.
+  // Lo recreamos como una sesión nueva, todavía sin nombre/listo,
+  // para que la sala vuelva a mostrar 0 de 1 y crezca a medida
+  // que ingresen nuevas personas.
+  await loadParticipant();
+  await loadParticipants();
   render();
 }
 

@@ -60,7 +60,10 @@ const state = {
 
   isFacilitator: false,
 
-  facilitatorSessionId: null
+  facilitatorSessionId: null,
+  facilitatorName: null,
+  retroStarted: false,
+  participants: []
 };
 
 
@@ -360,6 +363,221 @@ async function loadMyVotes() {
 
 
 // =====================================================
+// PERFIL DEL PARTICIPANTE
+// =====================================================
+
+async function setParticipantProfile(nombre, listo) {
+
+  if (!state.retroId || !state.participantSessionId) {
+    return false;
+  }
+
+  const cleanName = String(nombre || "").trim();
+
+  if (!cleanName) {
+    alert("Ingresá tu nombre y apellido.");
+    return false;
+  }
+
+  const { data, error } = await supabaseClient
+    .rpc("set_participant_profile", {
+      p_retro_id: state.retroId,
+      p_session_id: state.participantSessionId,
+      p_nombre: cleanName,
+      p_listo: Boolean(listo)
+    });
+
+  if (error) {
+    console.error("Error actualizando perfil:", error);
+    alert("No se pudo guardar tu perfil.\n\n" + error.message);
+    return false;
+  }
+
+  state.participant = {
+    ...(state.participant || {}),
+    nombre: cleanName,
+    listo: Boolean(listo)
+  };
+
+  console.log("Perfil actualizado:", data);
+  await loadParticipants();
+  render();
+  return true;
+}
+
+
+async function loadParticipants() {
+
+  if (!state.retroId) {
+    return;
+  }
+
+  const { data, error } = await supabaseClient
+    .from("participantes")
+    .select("id, retro_id, session_id, nombre, listo, created_at")
+    .eq("retro_id", state.retroId)
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    console.error("Error cargando participantes:", error);
+    return;
+  }
+
+  state.participants = data || [];
+
+  const current = state.participants.find(
+    participant => participant.id === state.participantId
+  );
+
+  if (current) {
+    state.participant = current;
+  }
+}
+
+
+function getParticipantName() {
+  return (state.participant?.nombre || "").trim();
+}
+
+
+function isParticipantReady() {
+  return Boolean(state.participant?.listo);
+}
+
+
+function lobbyScreen() {
+
+  const readyCount = state.participants.filter(
+    participant => participant.listo
+  ).length;
+
+  const totalCount = state.participants.length;
+  const currentName = getParticipantName();
+  const currentReady = isParticipantReady();
+
+  return `
+    <section>
+
+      <div class="eyebrow">
+        Antes de empezar
+      </div>
+
+      <h2>
+        Preparémonos para la retro.
+      </h2>
+
+      <p class="lead">
+        Ingresá tu nombre y apellido y marcate como listo.
+        El facilitador va a iniciar la retro cuando considere que es momento de empezar.
+      </p>
+
+      <div
+        class="card"
+        style="margin-top:30px;">
+
+        <div class="eyebrow" style="margin-bottom:10px;">
+          Tu identificación
+        </div>
+
+        <input
+          id="participantName"
+          type="text"
+          value="${escapeHtml(currentName)}"
+          placeholder="Nombre y apellido"
+          autocomplete="name"
+          style="width:100%;"
+          ${currentReady ? "disabled" : ""}>
+
+        <button
+          id="readyBtn"
+          class="primary"
+          style="margin-top:12px;"
+          ${currentReady ? "disabled" : ""}>
+          ${currentReady ? "✓ Listo para empezar" : "Listo para empezar"}
+        </button>
+
+        ${currentReady ? `
+          <button
+            id="editParticipantBtn"
+            style="
+              margin-top:10px;
+              padding:9px 14px;
+              border-radius:10px;
+              cursor:pointer;
+              background:transparent;
+              border:1px solid rgba(255,255,255,.18);
+              color:inherit;
+            ">
+            Cambiar nombre
+          </button>
+        ` : ""}
+
+      </div>
+
+      <div
+        class="card"
+        style="margin-top:20px;">
+
+        <div class="eyebrow" style="margin-bottom:14px;">
+          Participantes
+        </div>
+
+        <div style="display:grid;gap:10px;">
+          ${
+            state.participants.length === 0
+              ? `<p style="margin:0;opacity:.65;">Todavía no hay participantes.</p>`
+              : state.participants.map(participant => `
+                <div
+                  style="
+                    display:flex;
+                    align-items:center;
+                    justify-content:space-between;
+                    gap:12px;
+                    padding:10px 0;
+                    border-bottom:1px solid rgba(255,255,255,.07);
+                  ">
+                  <span>
+                    ${escapeHtml(participant.nombre || "Sin identificar")}
+                  </span>
+                  <span
+                    class="badge"
+                    style="
+                      ${participant.listo
+                        ? "border-color:rgba(84,255,209,.3);"
+                        : "opacity:.65;"}
+                    ">
+                    ${participant.listo ? "✓ Listo" : "○ Pendiente"}
+                  </span>
+                </div>
+              `).join("")
+          }
+        </div>
+
+        <p style="margin:18px 0 0;opacity:.7;">
+          ${readyCount} de ${totalCount} listos
+        </p>
+
+      </div>
+
+      ${state.isFacilitator ? `
+        <div
+          class="card"
+          style="margin-top:20px;border-color:rgba(84,255,209,.25);">
+          <strong>
+            Tenés el control como facilitador.
+          </strong>
+          <p style="margin-bottom:0;opacity:.75;">
+            Podés iniciar la retro aunque todavía no estén todos listos.
+          </p>
+        </div>
+      ` : ""}
+
+    </section>
+  `;
+}
+
+
+// =====================================================
 // FACILITADOR - ESTADO
 // =====================================================
 
@@ -427,12 +645,21 @@ async function claimFacilitator() {
   );
 
 
+  // Al tomar el control, el facilitador queda
+  // identificado y listo para comenzar.
+  await setParticipantProfile(
+    state.participant?.nombre || "",
+    true
+  );
+
+
   // ---------------------------------------------------
   // Volvemos a consultar la retro para conocer
   // el estado real del facilitador.
   // ---------------------------------------------------
 
   await refreshRetroState();
+  await loadParticipants();
 
   render();
 }
@@ -540,6 +767,35 @@ async function releaseFacilitator() {
 
   await refreshRetroState();
 
+  render();
+}
+
+
+// =====================================================
+// FACILITADOR - INICIAR RETRO
+// =====================================================
+
+async function startRetro() {
+
+  if (!state.isFacilitator) {
+    return;
+  }
+
+  const { data, error } = await supabaseClient
+    .rpc("start_retro", {
+      p_retro_id: state.retroId,
+      p_session_id: state.participantSessionId
+    });
+
+  if (error) {
+    console.error("Error iniciando retro:", error);
+    alert("No se pudo iniciar la retro.\n\n" + error.message);
+    return;
+  }
+
+  console.log("Retro iniciada:", data);
+  state.retroStarted = true;
+  state.step = Number(data?.step || 0);
   render();
 }
 
@@ -711,7 +967,7 @@ async function refreshRetroState() {
   } = await supabaseClient
     .from("retros")
     .select(
-      "id, codigo, nombre, paso_actual, facilitador_session_id"
+      "id, codigo, nombre, paso_actual, facilitador_session_id, facilitador_nombre, iniciada"
     )
     .eq("id", state.retroId)
     .single();
@@ -733,6 +989,12 @@ async function refreshRetroState() {
 
   state.facilitatorSessionId =
     data.facilitador_session_id || null;
+
+  state.facilitatorName =
+    data.facilitador_nombre || null;
+
+  state.retroStarted =
+    Boolean(data.iniciada);
 
   updateFacilitatorState();
 
@@ -797,6 +1059,10 @@ function facilitatorControls() {
           <strong>
             Tenés el control de la retro
           </strong>
+
+          <div style="margin-top:4px;opacity:.7;font-size:13px;">
+            ${escapeHtml(state.facilitatorName || getParticipantName())}
+          </div>
         </div>
 
         <button
@@ -850,6 +1116,12 @@ function facilitatorControls() {
         <strong>
           El facilitador controla el avance de la retro
         </strong>
+
+        ${state.facilitatorName ? `
+          <div style="margin-top:4px;opacity:.7;font-size:13px;">
+            ${escapeHtml(state.facilitatorName)}
+          </div>
+        ` : ""}
 
       </div>
     `;
@@ -1055,12 +1327,16 @@ function render() {
   }
 
 
-  stepLabel.textContent =
-    `${state.step + 1} / ${steps.length}`;
+  if (!state.retroStarted) {
+    stepLabel.textContent = "Preparación";
+    progressBar.style.width = "0%";
+  } else {
+    stepLabel.textContent =
+      `${state.step + 1} / ${steps.length}`;
 
-
-  progressBar.style.width =
-    `${((state.step + 1) / steps.length) * 100}%`;
+    progressBar.style.width =
+      `${((state.step + 1) / steps.length) * 100}%`;
+  }
 
 
   // ---------------------------------------------------
@@ -1093,36 +1369,37 @@ function render() {
   // BOTÓN SIGUIENTE
   // ---------------------------------------------------
 
-  if (state.step === steps.length - 1) {
+  if (!state.retroStarted) {
 
-    nextBtn.textContent =
-      "Retro finalizada ✓";
+    backBtn.style.visibility = "hidden";
+    backBtn.disabled = true;
 
-    nextBtn.disabled =
-      true;
+    if (state.isFacilitator) {
+      nextBtn.textContent = "Iniciar retro →";
+      nextBtn.disabled = false;
+    } else {
+      nextBtn.textContent = "Esperando al facilitador";
+      nextBtn.disabled = true;
+    }
 
-  }
+  } else if (state.step === steps.length - 1) {
 
-  else if (!state.isFacilitator) {
+    nextBtn.textContent = "Retro finalizada ✓";
+    nextBtn.disabled = true;
 
-    nextBtn.textContent =
-      "Esperando al facilitador";
+  } else if (!state.isFacilitator) {
 
-    nextBtn.disabled =
-      true;
+    nextBtn.textContent = "Esperando al facilitador";
+    nextBtn.disabled = true;
 
-  }
-
-  else {
+  } else {
 
     nextBtn.textContent =
       state.step === 0
-        ? "Comenzar →"
+        ? "Continuar →"
         : "Continuar →";
 
-    nextBtn.disabled =
-      false;
-
+    nextBtn.disabled = false;
   }
 
 
@@ -1132,7 +1409,9 @@ function render() {
 
   app.innerHTML =
     facilitatorControls() +
-    screens[state.step]() +
+    (state.retroStarted
+      ? screens[state.step]()
+      : lobbyScreen()) +
     facilitatorModal();
 
 
@@ -2008,7 +2287,7 @@ async function loadRetro() {
     await supabaseClient
       .from("retros")
       .select(
-        "id, codigo, nombre, paso_actual, facilitador_session_id"
+        "id, codigo, nombre, paso_actual, facilitador_session_id, facilitador_nombre, iniciada"
       )
       .eq("codigo", RETRO_CODE)
       .single();
@@ -2036,6 +2315,12 @@ async function loadRetro() {
 
   state.facilitatorSessionId =
     data.facilitador_session_id || null;
+
+  state.facilitatorName =
+    data.facilitador_nombre || null;
+
+  state.retroStarted =
+    Boolean(data.iniciada);
 
   updateFacilitatorState();
 
@@ -2206,12 +2491,17 @@ function subscribeToRetro() {
           payload.new.facilitador_session_id ||
           null;
 
-
         state.step =
           newStep;
 
         state.facilitatorSessionId =
           newFacilitator;
+
+        state.facilitatorName =
+          payload.new.facilitador_nombre || null;
+
+        state.retroStarted =
+          Boolean(payload.new.iniciada);
 
         updateFacilitatorState();
 
@@ -2228,6 +2518,34 @@ function subscribeToRetro() {
         status
       );
 
+    });
+}
+
+
+// =====================================================
+// REALTIME - PARTICIPANTES
+// =====================================================
+
+function subscribeToParticipants() {
+
+  supabaseClient
+    .channel("participants-realtime-" + state.retroId)
+    .on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "participantes",
+        filter: `retro_id=eq.${state.retroId}`
+      },
+      async payload => {
+        console.log("Cambio en participante:", payload);
+        await loadParticipants();
+        render();
+      }
+    )
+    .subscribe(status => {
+      console.log("Realtime participantes:", status);
     });
 }
 
@@ -2583,6 +2901,49 @@ async function bind() {
 
     };
 
+  }
+
+
+  // ===================================================
+  // LOBBY - PERFIL
+  // ===================================================
+
+  const readyBtn =
+    document.querySelector("#readyBtn");
+
+  if (readyBtn) {
+    readyBtn.onclick = async () => {
+      const input = document.querySelector("#participantName");
+      const name = input ? input.value.trim() : "";
+
+      if (!name) {
+        alert("Ingresá tu nombre y apellido.");
+        if (input) input.focus();
+        return;
+      }
+
+      readyBtn.disabled = true;
+      readyBtn.textContent = "Guardando...";
+      await setParticipantProfile(name, true);
+    };
+  }
+
+  const editParticipantBtn =
+    document.querySelector("#editParticipantBtn");
+
+  if (editParticipantBtn) {
+    editParticipantBtn.onclick = async () => {
+      const input = document.querySelector("#participantName");
+      if (!input) return;
+
+      input.disabled = false;
+      input.focus();
+      input.select();
+
+      const current = state.participant || {};
+      state.participant = { ...current, listo: false };
+      await setParticipantProfile(input.value, false);
+    };
   }
 
 
@@ -3043,24 +3404,19 @@ document
   .onclick = async () => {
 
     if (!state.isFacilitator) {
-
       return;
-
     }
 
-
-    if (
-      state.step >=
-      steps.length - 1
-    ) {
-
+    if (!state.retroStarted) {
+      await startRetro();
       return;
-
     }
 
+    if (state.step >= steps.length - 1) {
+      return;
+    }
 
     await advanceRetro();
-
   };
 
 
@@ -3152,12 +3508,16 @@ async function initialize() {
 
   await loadMyVotes();
 
+  await loadParticipants();
+
 
   // ---------------------------------------------------
   // REALTIME
   // ---------------------------------------------------
 
   subscribeToRetro();
+
+  subscribeToParticipants();
 
   subscribeToCards();
 

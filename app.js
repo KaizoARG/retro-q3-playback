@@ -3487,24 +3487,31 @@ async function bind() {
         }));
         render();
 
+        // La tabla cards tiene RLS. En vez de hacer UPDATE directo desde el
+        // navegador, usamos una RPC que valida que quien agrupa sea el
+        // facilitador actual y realiza el UPDATE de forma segura.
         const results = await Promise.all(
           updates.map(async update => {
-            const { data, error } = await supabaseClient
-              .from("cards")
-              .update({ topic_key: update.topic_key })
-              .eq("id", update.id)
-              .eq("retro_id", state.retroId)
-              .select("id, topic_key");
+            const { data, error } = await supabaseClient.rpc(
+              "set_card_topic",
+              {
+                p_retro_id: state.retroId,
+                p_session_id: state.participantSessionId,
+                p_card_id: update.id,
+                p_topic_key: update.topic_key
+              }
+            );
 
             if (error) throw error;
 
-            if (!data || data.length === 0) {
+            if (!data || !data.success) {
               throw new Error(
-                `No se pudo actualizar la tarjeta ${update.id}. Verificá las políticas de acceso (RLS) de la tabla cards.`
+                data?.message ||
+                `No se pudo actualizar la tarjeta ${update.id}.`
               );
             }
 
-            return data[0];
+            return data;
           })
         );
 

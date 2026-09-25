@@ -75,6 +75,7 @@ const state = {
   retroFinishedAt: null,
   feedbackSubmitted: false,
   feedbackLoaded: false,
+  showFeedback: false,
   participants: []
 };
 
@@ -1560,6 +1561,7 @@ async function refreshRetroState() {
 
   state.retroStartedAt = data.iniciada_en || null;
   state.retroFinishedAt = data.finalizada_en || null;
+  state.showFeedback = Boolean(data.finalizada_en);
 
   updateFacilitatorState();
 
@@ -1963,6 +1965,9 @@ function feedbackLanding() {
         <p class="lead" style="margin-top:14px">
           Tu feedback nos ayuda a mejorar tanto el espacio como la herramienta.
         </p>
+        <button type="button" id="feedbackBackBtn" style="margin-top:24px;padding:11px 16px;border-radius:10px;cursor:pointer;background:transparent;border:1px solid rgba(255,255,255,.18);color:inherit">
+          ← Volver al cierre
+        </button>
       </section>
     `;
   }
@@ -1991,6 +1996,9 @@ function feedbackLanding() {
         <textarea id="feedbackTool" rows="4" placeholder="¿Qué mejorarías de la herramienta? ¿Qué funcionalidad nueva agregarías?" style="width:100%;margin-top:10px;resize:vertical">${escapeHtml(feedback.feedback_herramienta || "")}</textarea>
 
         <button id="submitFeedbackBtn" class="primary" style="margin-top:24px;width:100%;padding:13px 18px">Enviar feedback</button>
+        <button type="button" id="feedbackBackBtn" style="margin-top:12px;width:100%;padding:11px 16px;border-radius:10px;cursor:pointer;background:transparent;border:1px solid rgba(255,255,255,.18);color:inherit">
+          ← Volver al cierre
+        </button>
       </div>
     </section>
   `;
@@ -2026,19 +2034,30 @@ function render() {
     return;
   }
 
-  if (state.retroFinishedAt && state.step === steps.length - 1) {
+  if (state.retroFinishedAt && state.step === steps.length - 1 && state.showFeedback) {
     stepLabel.textContent = "Feedback";
     progressBar.style.width = "100%";
-    backBtn.style.visibility = "hidden";
-    backBtn.disabled = true;
+    backBtn.style.visibility = "visible";
+    backBtn.disabled = false;
+    backBtn.textContent = "← Volver al cierre";
     nextBtn.style.display = "none";
     app.innerHTML = feedbackLanding();
+
+    const feedbackBackBtn = document.querySelector("#feedbackBackBtn");
+    if (feedbackBackBtn) {
+      feedbackBackBtn.onclick = () => {
+        state.showFeedback = false;
+        render();
+      };
+    }
+
     const submitFeedbackBtn = document.querySelector("#submitFeedbackBtn");
     if (submitFeedbackBtn) submitFeedbackBtn.onclick = submitFeedback;
     return;
   }
 
   nextBtn.style.display = "";
+  backBtn.textContent = "← Atrás";
 
   if (!state.retroStarted) {
     stepLabel.textContent = "Preparación";
@@ -3143,6 +3162,7 @@ async function loadRetro() {
 
   state.retroStartedAt = data.iniciada_en || null;
   state.retroFinishedAt = data.finalizada_en || null;
+  state.showFeedback = Boolean(data.finalizada_en);
 
   updateFacilitatorState();
 
@@ -5281,6 +5301,14 @@ document
       state.step >=
       steps.length - 1
     ) {
+      const shouldFinish = window.confirm(
+        "¿Confirmás que querés finalizar la retro?\n\nUna vez finalizada, el equipo pasará a la instancia de feedback."
+      );
+
+      if (!shouldFinish) {
+        return;
+      }
+
       const { data, error } = await supabaseClient.rpc("mark_retro_finished", {
         p_retro_id: state.retroId,
         p_session_id: state.participantSessionId
@@ -5293,6 +5321,7 @@ document
       }
 
       state.retroFinishedAt = data?.finalizada_en || new Date().toISOString();
+      state.showFeedback = true;
       await loadMyFeedback();
       render();
       return;

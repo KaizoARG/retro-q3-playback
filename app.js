@@ -30,8 +30,20 @@ const state = {
   // Votos acumulados de todos los participantes
   votes: {},
 
-  // Votos realizados por ESTE navegador
+  // Votos realizados por este participante
   myVotes: {},
+
+  // Cantidad de votos utilizados
+  usedVotes: 0,
+
+  // Session ID del navegador
+  participantSessionId: null,
+
+  // ID del participante en Supabase
+  participantId: null,
+
+  // Datos del participante
+  participant: null,
 
   // Tarjetas de la retro
   cards: [],
@@ -120,6 +132,221 @@ function getTopicCount(topicKey) {
 function getGroupedCards(topicKey) {
   return state.cards.filter(
     card => card.topic_key === topicKey
+  );
+}
+
+
+// =====================================================
+// SESSION ID
+// =====================================================
+
+function getParticipantSessionId() {
+
+  if (!state.retroId) {
+    console.error(
+      "No se puede generar Session ID sin retroId."
+    );
+
+    return null;
+  }
+
+  const storageKey =
+    `retro-session-id-${state.retroId}`;
+
+  let sessionId =
+    localStorage.getItem(storageKey);
+
+  if (!sessionId) {
+
+    sessionId =
+      crypto.randomUUID();
+
+    localStorage.setItem(
+      storageKey,
+      sessionId
+    );
+
+    console.log(
+      "Nuevo Session ID generado:",
+      sessionId
+    );
+
+  } else {
+
+    console.log(
+      "Session ID recuperado:",
+      sessionId
+    );
+  }
+
+  state.participantSessionId =
+    sessionId;
+
+  return sessionId;
+}
+
+
+// =====================================================
+// PARTICIPANTE
+// =====================================================
+
+async function loadParticipant() {
+
+  const sessionId =
+    getParticipantSessionId();
+
+  if (!sessionId) {
+    return false;
+  }
+
+  console.log(
+    "Session ID:",
+    sessionId
+  );
+
+
+  // ---------------------------------------------------
+  // BUSCAR PARTICIPANTE EXISTENTE
+  // ---------------------------------------------------
+
+  const {
+    data: existing,
+    error: searchError
+  } = await supabaseClient
+    .from("participantes")
+    .select("*")
+    .eq("retro_id", state.retroId)
+    .eq("session_id", sessionId)
+    .maybeSingle();
+
+
+  if (searchError) {
+
+    console.error(
+      "Error buscando participante:",
+      searchError
+    );
+
+    return false;
+  }
+
+
+  if (existing) {
+
+    state.participant =
+      existing;
+
+    state.participantId =
+      existing.id;
+
+    console.log(
+      "Participante recuperado:",
+      existing
+    );
+
+    return true;
+  }
+
+
+  // ---------------------------------------------------
+  // CREAR PARTICIPANTE
+  // ---------------------------------------------------
+
+  const {
+    data: created,
+    error: createError
+  } = await supabaseClient
+    .from("participantes")
+    .insert({
+      retro_id: state.retroId,
+      session_id: sessionId
+    })
+    .select()
+    .single();
+
+
+  if (createError) {
+
+    console.error(
+      "Error creando participante:",
+      createError
+    );
+
+    return false;
+  }
+
+
+  state.participant =
+    created;
+
+  state.participantId =
+    created.id;
+
+  console.log(
+    "Nuevo participante creado:",
+    created
+  );
+
+  return true;
+}
+
+
+// =====================================================
+// CARGAR VOTOS DEL PARTICIPANTE
+// =====================================================
+
+async function loadMyVotes() {
+
+  if (!state.participantId) {
+    return;
+  }
+
+  const {
+    data,
+    error
+  } = await supabaseClient
+    .from("voto_participantes")
+    .select("topic_key")
+    .eq("retro_id", state.retroId)
+    .eq("participante_id", state.participantId);
+
+
+  if (error) {
+
+    console.error(
+      "Error cargando votos del participante:",
+      error
+    );
+
+    state.myVotes = {};
+    state.usedVotes = 0;
+
+    return;
+  }
+
+
+  state.myVotes = {};
+
+  (data || []).forEach(row => {
+
+    state.myVotes[row.topic_key] =
+      (state.myVotes[row.topic_key] || 0) + 1;
+
+  });
+
+
+  state.usedVotes =
+    (data || []).length;
+
+
+  console.log(
+    "Mis votos:",
+    state.myVotes
+  );
+
+  console.log(
+    "Votos utilizados:",
+    state.usedVotes
   );
 }
 
@@ -423,8 +650,6 @@ const screens = [
         </p>
 
 
-        <!-- RESUMEN DE TEMAS -->
-
         <div
           class="topic-list"
           style="margin-top:30px">
@@ -456,8 +681,6 @@ const screens = [
         </div>
 
 
-        <!-- TARJETAS SIN AGRUPAR -->
-
         ${
           ungroupedCards.length > 0
             ? `
@@ -480,8 +703,6 @@ const screens = [
             : ""
         }
 
-
-        <!-- TODAS LAS TARJETAS -->
 
         <div
           style="
@@ -590,17 +811,11 @@ const screens = [
 
   () => {
 
-    const usedVotes =
-      Object.values(state.myVotes)
-        .reduce(
-          (sum, value) => sum + value,
-          0
-        );
-
     const remainingVotes =
       Math.max(
         0,
-        MAX_VOTES_PER_PARTICIPANT - usedVotes
+        MAX_VOTES_PER_PARTICIPANT -
+          state.usedVotes
       );
 
     return `
@@ -1049,7 +1264,8 @@ async function loadRetro() {
     return false;
   }
 
-  state.retroId = data.id;
+  state.retroId =
+    data.id;
 
   console.log(
     "Retro cargada:",
@@ -1085,7 +1301,8 @@ async function loadCards() {
     return;
   }
 
-  state.cards = data || [];
+  state.cards =
+    data || [];
 
   console.log(
     "Tarjetas cargadas:",
@@ -1135,7 +1352,7 @@ async function loadActions() {
 
 
 // =====================================================
-// CARGAR VOTOS
+// CARGAR VOTOS GLOBALES
 // =====================================================
 
 async function loadVotes() {
@@ -1173,62 +1390,6 @@ async function loadVotes() {
 
 
 // =====================================================
-// CARGAR MIS VOTOS
-// =====================================================
-
-function loadMyVotes() {
-
-  if (!state.retroId) {
-    return;
-  }
-
-  const storageKey =
-    `retro-my-votes-${state.retroId}`;
-
-  try {
-
-    const saved =
-      localStorage.getItem(storageKey);
-
-    state.myVotes =
-      saved
-        ? JSON.parse(saved)
-        : {};
-
-  } catch (error) {
-
-    console.error(
-      "Error cargando votos locales:",
-      error
-    );
-
-    state.myVotes = {};
-  }
-
-  console.log(
-    "Mis votos:",
-    state.myVotes
-  );
-}
-
-
-// =====================================================
-// GUARDAR MIS VOTOS
-// =====================================================
-
-function saveMyVotes() {
-
-  const storageKey =
-    `retro-my-votes-${state.retroId}`;
-
-  localStorage.setItem(
-    storageKey,
-    JSON.stringify(state.myVotes)
-  );
-}
-
-
-// =====================================================
 // REALTIME - CARDS
 // =====================================================
 
@@ -1259,9 +1420,7 @@ function subscribeToCards() {
         );
 
 
-        // ---------------------------------------------
         // INSERT
-        // ---------------------------------------------
 
         if (
           payload.eventType === "INSERT"
@@ -1284,9 +1443,7 @@ function subscribeToCards() {
         }
 
 
-        // ---------------------------------------------
         // UPDATE
-        // ---------------------------------------------
 
         if (
           payload.eventType === "UPDATE"
@@ -1308,9 +1465,7 @@ function subscribeToCards() {
         }
 
 
-        // ---------------------------------------------
         // DELETE
-        // ---------------------------------------------
 
         if (
           payload.eventType === "DELETE"
@@ -1415,6 +1570,84 @@ function subscribeToVotes() {
 
 
 // =====================================================
+// REALTIME - ACCIONES
+// =====================================================
+
+function subscribeToActions() {
+
+  supabaseClient
+
+    .channel(
+      "actions-realtime-" +
+      state.retroId
+    )
+
+    .on(
+      "postgres_changes",
+      {
+        event: "INSERT",
+        schema: "public",
+        table: "acciones",
+        filter:
+          `retro_id=eq.${state.retroId}`
+      },
+
+      payload => {
+
+        console.log(
+          "Nueva acción recibida:",
+          payload.new
+        );
+
+        if (!payload.new) {
+          return;
+        }
+
+        const exists =
+          state.actions.some(
+            action =>
+              action.id === payload.new.id
+          );
+
+        if (exists) {
+          return;
+        }
+
+        state.actions.push({
+          id: payload.new.id,
+          text: payload.new.descripcion,
+          owner:
+            payload.new.responsable ||
+            "Por definir",
+          date:
+            payload.new.fecha ||
+            "Por definir"
+        });
+
+        if (
+          state.step === 6 ||
+          state.step === 7
+        ) {
+
+          render();
+
+        }
+
+      }
+    )
+
+    .subscribe(status => {
+
+      console.log(
+        "Realtime acciones:",
+        status
+      );
+
+    });
+}
+
+
+// =====================================================
 // EVENTOS
 // =====================================================
 
@@ -1457,19 +1690,20 @@ async function bind() {
         const topicKey =
           select.value || null;
 
-
         select.disabled = true;
 
 
-        const { data, error } =
-          await supabaseClient
-            .from("cards")
-            .update({
-              topic_key: topicKey
-            })
-            .eq("id", cardId)
-            .select()
-            .single();
+        const {
+          data,
+          error
+        } = await supabaseClient
+          .from("cards")
+          .update({
+            topic_key: topicKey
+          })
+          .eq("id", cardId)
+          .select()
+          .single();
 
 
         if (error) {
@@ -1502,7 +1736,6 @@ async function bind() {
               card.id === cardId
           );
 
-
         if (index !== -1) {
 
           state.cards[index] =
@@ -1532,17 +1765,18 @@ async function bind() {
           button.dataset.topic;
 
 
-        const usedVotes =
-          Object.values(state.myVotes)
-            .reduce(
-              (sum, value) =>
-                sum + value,
-              0
-            );
+        if (!state.participantId) {
+
+          alert(
+            "No se pudo identificar tu participación en la retro."
+          );
+
+          return;
+        }
 
 
         if (
-          usedVotes >=
+          state.usedVotes >=
           MAX_VOTES_PER_PARTICIPANT
         ) {
 
@@ -1558,21 +1792,26 @@ async function bind() {
 
 
         // ---------------------------------------------
-        // INCREMENTAR VOTO EN SUPABASE
+        // REGISTRAR VOTO DEL PARTICIPANTE
         // ---------------------------------------------
 
-        const { data, error } =
-          await supabaseClient
-            .rpc(
-              "increment_vote",
-              {
-                p_retro_id:
-                  state.retroId,
+        const {
+          data,
+          error
+        } = await supabaseClient
+          .rpc(
+            "cast_vote",
+            {
+              p_retro_id:
+                state.retroId,
 
-                p_topic_key:
-                  topicKey
-              }
-            );
+              p_participante_id:
+                state.participantId,
+
+              p_topic_key:
+                topicKey
+            }
+          );
 
 
         if (error) {
@@ -1600,23 +1839,37 @@ async function bind() {
 
 
         // ---------------------------------------------
-        // ACTUALIZAR VOTOS LOCALES
+        // ACTUALIZAR VOTOS DEL PARTICIPANTE
         // ---------------------------------------------
 
         state.myVotes[topicKey] =
           (state.myVotes[topicKey] || 0) + 1;
 
-        saveMyVotes();
+        state.usedVotes =
+          state.usedVotes + 1;
 
 
         // ---------------------------------------------
         // ACTUALIZAR TOTAL GLOBAL
         // ---------------------------------------------
 
-        if (data) {
+        if (
+          data &&
+          data.topic_key &&
+          data.votos !== undefined
+        ) {
 
           state.votes[data.topic_key] =
             data.votos;
+
+        } else {
+
+          // El RPC actual devuelve JSON con
+          // used_votes / remaining_votes.
+          // El realtime de votos actualizará
+          // el total global.
+
+          await loadVotes();
 
         }
 
@@ -1665,17 +1918,19 @@ async function bind() {
       addCard.disabled = true;
 
 
-      const { data, error } =
-        await supabaseClient
-          .from("cards")
-          .insert({
-            contenido: text,
-            etapa: type,
-            retro_id: state.retroId,
-            topic_key: null
-          })
-          .select()
-          .single();
+      const {
+        data,
+        error
+      } = await supabaseClient
+        .from("cards")
+        .insert({
+          contenido: text,
+          etapa: type,
+          retro_id: state.retroId,
+          topic_key: null
+        })
+        .select()
+        .single();
 
 
       if (error) {
@@ -1707,7 +1962,6 @@ async function bind() {
           card =>
             card.id === data.id
         );
-
 
       if (!exists) {
 
@@ -1772,21 +2026,19 @@ async function bind() {
       add.disabled = true;
 
 
-      // ---------------------------------------------
-      // GUARDAR ACCIÓN
-      // ---------------------------------------------
-
-      const { data, error } =
-        await supabaseClient
-          .from("acciones")
-          .insert({
-            descripcion: text,
-            responsable: owner,
-            fecha: date,
-            retro_id: state.retroId
-          })
-          .select()
-          .single();
+      const {
+        data,
+        error
+      } = await supabaseClient
+        .from("acciones")
+        .insert({
+          descripcion: text,
+          responsable: owner,
+          fecha: date,
+          retro_id: state.retroId
+        })
+        .select()
+        .single();
 
 
       if (error) {
@@ -1818,10 +2070,6 @@ async function bind() {
       );
 
 
-      // ---------------------------------------------
-      // AGREGAR AL ESTADO LOCAL
-      // ---------------------------------------------
-
       const newAction = {
 
         id:
@@ -1834,7 +2082,8 @@ async function bind() {
           data.responsable,
 
         date:
-          data.fecha || "Por definir"
+          data.fecha ||
+          "Por definir"
 
       };
 
@@ -1914,6 +2163,15 @@ document
 
 async function initialize() {
 
+  console.log(
+    "Inicializando retro..."
+  );
+
+
+  // ---------------------------------------------------
+  // RETRO
+  // ---------------------------------------------------
+
   const retroLoaded =
     await loadRetro();
 
@@ -1923,23 +2181,51 @@ async function initialize() {
   }
 
 
-  await loadCards();
+  // ---------------------------------------------------
+  // PARTICIPANTE
+  // ---------------------------------------------------
 
+  const participantLoaded =
+    await loadParticipant();
+
+
+  if (!participantLoaded) {
+
+    console.error(
+      "No se pudo inicializar participante."
+    );
+
+    return;
+  }
+
+
+  // ---------------------------------------------------
+  // DATOS
+  // ---------------------------------------------------
+
+  await loadCards();
 
   await loadActions();
 
-
   await loadVotes();
 
+  await loadMyVotes();
 
-  loadMyVotes();
 
+  // ---------------------------------------------------
+  // REALTIME
+  // ---------------------------------------------------
 
   subscribeToCards();
 
-
   subscribeToVotes();
 
+  subscribeToActions();
+
+
+  // ---------------------------------------------------
+  // RENDER
+  // ---------------------------------------------------
 
   render();
 

@@ -430,6 +430,11 @@ async function loadParticipants() {
 
   if (current) {
     state.participant = current;
+  } else {
+    // Si el participante fue eliminado (por ejemplo, al reiniciar la sala),
+    // limpiar también la identidad local para volver a pedir nombre y apellido.
+    state.participant = null;
+    state.participantId = null;
   }
 }
 
@@ -755,8 +760,8 @@ async function resetRetro() {
 
   const confirmed = window.confirm(
     "¿Reiniciar la sala?\n\n" +
-    "Se van a borrar todas las tarjetas de cosecha, agrupaciones, votos y acciones.\n" +
-    "Los nombres de los participantes se conservarán, pero todos quedarán como pendientes.\n\n" +
+    "Se van a borrar todas las tarjetas de cosecha, agrupaciones, votos, acciones y participantes.\n" +
+    "Todos tendrán que volver a ingresar su nombre para participar.\n\n" +
     "Esta acción no se puede deshacer."
   );
 

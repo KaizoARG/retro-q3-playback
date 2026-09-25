@@ -2242,12 +2242,15 @@ const screens = [
                 <p>
                   El sistema analiza las tarjetas de la actividad, detecta patrones de palabras y propone hasta 3 temas en común.
                 </p>
-                <button
-                  class="primary"
-                  id="generateTopicsBtn"
-                  style="margin-top:12px">
-                  ${dynamicTopics.length ? "Regenerar temas en común" : "Generar temas en común"}
-                </button>
+                <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px;">
+                  <button class="primary" id="generateTopicsBtn" style="margin-top:0">
+                    ${dynamicTopics.length ? "Volver a generar temas en común" : "Generar temas en común"}
+                  </button>
+                  <button type="button" id="clearAllTopicsBtn" ${dynamicTopics.length ? "" : "disabled"}
+                    style="padding:10px 14px;border-radius:10px;border:1px solid rgba(255,255,255,.14);background:${dynamicTopics.length ? "transparent" : "rgba(255,255,255,.05)"};color:${dynamicTopics.length ? "inherit" : "rgba(255,255,255,.35)"};cursor:${dynamicTopics.length ? "pointer" : "not-allowed"};opacity:${dynamicTopics.length ? "1" : ".65"};" title="Borrar todos los temas en común">
+                    🗑️ Borrar todos
+                  </button>
+                </div>
               </div>
             `
             : `
@@ -2607,11 +2610,12 @@ const screens = [
                   El sistema puede proponer preguntas a partir del tema priorizado
                   y de las situaciones que aparecieron en la actividad.
                 </p>
-                <button
-                  class="primary"
-                  id="generateQuestionsBtn"
-                  style="margin-top:12px">
+                <button class="primary" id="generateQuestionsBtn" style="margin-top:12px">
                   Generar preguntas guía
+                </button>
+                <button type="button" id="clearAllGuidingQuestionsBtn" ${questions.length ? "" : "disabled"}
+                  style="margin-top:10px;padding:10px 14px;border-radius:10px;border:1px solid rgba(255,255,255,.14);background:${questions.length ? "transparent" : "rgba(255,255,255,.05)"};color:${questions.length ? "inherit" : "rgba(255,255,255,.35)"};cursor:${questions.length ? "pointer" : "not-allowed"};opacity:${questions.length ? "1" : ".65"};" title="Borrar todas las preguntas guía">
+                  🗑️ Borrar todas las preguntas
                 </button>
               </div>
             `
@@ -3901,6 +3905,27 @@ async function bind() {
   // CREAR / RENOMBRAR / ELIMINAR TÓPICOS
   // ---------------------------------------------------
 
+  const clearAllTopicsBtn = document.querySelector("#clearAllTopicsBtn");
+
+  if (clearAllTopicsBtn) {
+    clearAllTopicsBtn.onclick = async () => {
+      if (!state.isFacilitator || !getDynamicTopics().length) return;
+      if (!confirm("¿Borrar todos los temas en común?\n\nLas tarjetas quedarán como \"Sin agrupar\" y se eliminarán los votos asociados.")) return;
+      clearAllTopicsBtn.disabled = true; clearAllTopicsBtn.textContent = "Borrando…";
+      try {
+        const { data, error } = await supabaseClient.rpc("clear_all_topics", { p_retro_id: state.retroId, p_session_id: state.participantSessionId });
+        if (error) throw error;
+        if (!data?.success) throw new Error(data?.message || "No se pudieron borrar los temas en común.");
+        await loadTopics(); await loadCards(); await loadVotes(); render();
+      } catch (error) {
+        console.error("Error borrando todos los temas en común:", error);
+        alert("No se pudieron borrar los temas en común.\n\n" + error.message);
+        clearAllTopicsBtn.disabled = false; clearAllTopicsBtn.textContent = "🗑️ Borrar todos";
+      }
+    };
+  }
+
+
   const addTopicBtn = document.querySelector("#addTopicBtn");
 
   if (addTopicBtn) {
@@ -4360,6 +4385,27 @@ async function bind() {
       }
     };
   }
+
+  const clearAllGuidingQuestionsBtn = document.querySelector("#clearAllGuidingQuestionsBtn");
+
+  if (clearAllGuidingQuestionsBtn) {
+    clearAllGuidingQuestionsBtn.onclick = async () => {
+      if (!state.isFacilitator || !state.guidingQuestions.length) return;
+      if (!confirm("¿Borrar todas las preguntas guía?\n\nSe eliminarán las preguntas automáticas y manuales.")) return;
+      clearAllGuidingQuestionsBtn.disabled = true; clearAllGuidingQuestionsBtn.textContent = "Borrando…";
+      try {
+        const { data, error } = await supabaseClient.rpc("clear_all_guiding_questions", { p_retro_id: state.retroId, p_session_id: state.participantSessionId });
+        if (error) throw error;
+        if (!data?.success) throw new Error(data?.message || "No se pudieron borrar las preguntas guía.");
+        await loadGuidingQuestions(); render();
+      } catch (error) {
+        console.error("Error borrando todas las preguntas guía:", error);
+        alert("No se pudieron borrar las preguntas guía.\n\n" + error.message);
+        clearAllGuidingQuestionsBtn.disabled = false; clearAllGuidingQuestionsBtn.textContent = "🗑️ Borrar todas las preguntas";
+      }
+    };
+  }
+
 
   const addGuidingQuestionBtn =
     document.querySelector("#addGuidingQuestionBtn");

@@ -50,6 +50,9 @@ const state = {
   // Tarjetas de la retro
   cards: [],
 
+  // Tópicos persistidos de la retro
+  topics: [],
+
   // Retro actual
   retroId: null,
 
@@ -147,6 +150,19 @@ function titleCaseTopic(label) {
 function getDynamicTopics() {
   const grouped = new Map();
 
+  // Los tópicos persistidos son la fuente principal porque permiten
+  // tener tópicos manuales aunque todavía no tengan tarjetas asignadas.
+  (state.topics || []).forEach(topic => {
+    grouped.set(topic.topic_key, {
+      key: topic.topic_key,
+      label: topic.label,
+      count: 0,
+      orden: topic.orden || 0
+    });
+  });
+
+  // Fallback para datos existentes que todavía no hayan sido migrados
+  // a retro_topics.
   state.cards
     .filter(card => card.topic_key)
     .forEach(card => {
@@ -156,7 +172,8 @@ function getDynamicTopics() {
         grouped.set(key, {
           key,
           label: key,
-          count: 0
+          count: 0,
+          orden: 9999
         });
       }
 
@@ -164,7 +181,11 @@ function getDynamicTopics() {
     });
 
   return Array.from(grouped.values())
-    .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
+    .sort((a, b) =>
+      (a.orden - b.orden) ||
+      b.count - a.count ||
+      a.label.localeCompare(b.label)
+    );
 }
 
 
@@ -190,7 +211,6 @@ function getGroupedCards(topicKey) {
     card => card.topic_key === topicKey
   );
 }
-
 
 function buildDynamicTopics(cards) {
   const prepared = cards.map(card => ({
@@ -375,25 +395,6 @@ function escapeHtml(value) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
-}
-
-
-function getTopicLabel(topicKey) {
-  return topicKey || "Sin agrupar";
-}
-
-
-function getTopicCount(topicKey) {
-  return state.cards.filter(
-    card => card.topic_key === topicKey
-  ).length;
-}
-
-
-function getGroupedCards(topicKey) {
-  return state.cards.filter(
-    card => card.topic_key === topicKey
-  );
 }
 
 
@@ -2171,22 +2172,91 @@ const screens = [
             `
         }
 
+        ${
+          state.isFacilitator
+            ? `
+              <div style="display:flex;align-items:center;gap:10px;margin-top:24px;">
+                <button
+                  id="addTopicBtn"
+                  type="button"
+                  style="
+                    padding:10px 14px;
+                    border-radius:10px;
+                    cursor:pointer;
+                    background:transparent;
+                    border:1px solid rgba(255,255,255,.18);
+                    color:inherit;
+                  ">
+                  + Agregar tópico
+                </button>
+              </div>
+            `
+            : ""
+        }
+
         <div class="topic-list" style="margin-top:30px">
           ${
             dynamicTopics.length
               ? dynamicTopics.map(topic => `
-                  <div class="topic">
-                    <strong>${escapeHtml(topic.label)}</strong>
-                    <span class="badge">
-                      ${topic.count}
-                      tarjeta${topic.count === 1 ? "" : "s"}
-                    </span>
+                  <div
+                    class="topic"
+                    style="display:flex;align-items:center;justify-content:space-between;gap:16px;">
+                    <div style="display:flex;align-items:center;gap:12px;min-width:0;">
+                      <strong>${escapeHtml(topic.label)}</strong>
+                      <span class="badge">
+                        ${topic.count}
+                        tarjeta${topic.count === 1 ? "" : "s"}
+                      </span>
+                    </div>
+
+                    ${
+                      state.isFacilitator
+                        ? `
+                          <div style="display:flex;gap:6px;flex-shrink:0;">
+                            <button
+                              type="button"
+                              data-topic-action="rename"
+                              style="
+                                width:36px;
+                                height:36px;
+                                border-radius:9px;
+                                cursor:pointer;
+                                background:transparent;
+                                border:1px solid rgba(255,255,255,.14);
+                                color:inherit;
+                              "
+                              data-topic-key="${escapeHtml(topic.key)}"
+                              title="Renombrar tópico"
+                              aria-label="Renombrar tópico">
+                              ✏️
+                            </button>
+                            <button
+                              type="button"
+                              data-topic-action="delete"
+                              style="
+                                width:36px;
+                                height:36px;
+                                border-radius:9px;
+                                cursor:pointer;
+                                background:transparent;
+                                border:1px solid rgba(255,255,255,.14);
+                                color:inherit;
+                              "
+                              data-topic-key="${escapeHtml(topic.key)}"
+                              title="Eliminar tópico"
+                              aria-label="Eliminar tópico">
+                              🗑️
+                            </button>
+                          </div>
+                        `
+                        : ""
+                    }
                   </div>
                 `).join("")
               : `
                 <div class="card">
                   <p>
-                    Todavía no hay tópicos generados.
+                    Todavía no hay tópicos. Generá una agrupación automática o agregá uno manualmente.
                   </p>
                 </div>
               `
@@ -2798,6 +2868,32 @@ async function loadCards() {
 
 
 // =====================================================
+// CARGAR TÓPICOS
+// =====================================================
+
+async function loadTopics() {
+
+  const { data, error } =
+    await supabaseClient
+      .from("retro_topics")
+      .select("id, retro_id, topic_key, label, orden, created_at")
+      .eq("retro_id", state.retroId)
+      .order("orden", { ascending: true })
+      .order("created_at", { ascending: true });
+
+  if (error) {
+    console.error("Error cargando tópicos:", error);
+    state.topics = [];
+    return;
+  }
+
+  state.topics = data || [];
+
+  console.log("Tópicos cargados:", state.topics);
+}
+
+
+// =====================================================
 // CARGAR ACCIONES
 // =====================================================
 
@@ -3096,6 +3192,37 @@ function subscribeToCards() {
         status
       );
 
+    });
+}
+
+
+// =====================================================
+// REALTIME - TÓPICOS
+// =====================================================
+
+function subscribeToTopics() {
+
+  supabaseClient
+    .channel("topics-realtime-" + state.retroId)
+    .on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "retro_topics",
+        filter: `retro_id=eq.${state.retroId}`
+      },
+      async payload => {
+        console.log("Cambio de tópicos recibido:", payload);
+        await loadTopics();
+
+        if (state.step >= 3 && state.step <= 7) {
+          render();
+        }
+      }
+    )
+    .subscribe(status => {
+      console.log("Realtime topics:", status);
     });
 }
 
@@ -3475,6 +3602,27 @@ async function bind() {
           candidates: candidates.map(topic => topic.label)
         });
 
+        // Persistimos primero los tópicos propuestos para que existan
+        // incluso si alguno todavía no tiene tarjetas asignadas.
+        for (const topic of candidates) {
+          const { data, error } = await supabaseClient.rpc(
+            "upsert_topic",
+            {
+              p_retro_id: state.retroId,
+              p_session_id: state.participantSessionId,
+              p_topic_key: topic.key,
+              p_label: topic.label
+            }
+          );
+
+          if (error) throw error;
+          if (!data?.success) {
+            throw new Error(data?.message || `No se pudo crear el tópico ${topic.label}.`);
+          }
+        }
+
+        await loadTopics();
+
         // Bloqueamos el realtime de cards durante esta operación para que
         // una actualización intermedia no vuelva a pintar datos viejos.
         suppressCardRealtime = true;
@@ -3574,78 +3722,159 @@ async function bind() {
     };
   }
 
+  // ---------------------------------------------------
+  // CREAR / RENOMBRAR / ELIMINAR TÓPICOS
+  // ---------------------------------------------------
+
+  const addTopicBtn = document.querySelector("#addTopicBtn");
+
+  if (addTopicBtn) {
+    addTopicBtn.onclick = async () => {
+      const label = prompt("Nombre del nuevo tópico:");
+      const cleanLabel = String(label || "").trim();
+
+      if (!cleanLabel) return;
+
+      addTopicBtn.disabled = true;
+
+      try {
+        const { data, error } = await supabaseClient.rpc(
+          "create_topic",
+          {
+            p_retro_id: state.retroId,
+            p_session_id: state.participantSessionId,
+            p_label: cleanLabel
+          }
+        );
+
+        if (error) throw error;
+        if (!data?.success) throw new Error(data?.message || "No se pudo crear el tópico.");
+
+        await loadTopics();
+        render();
+      } catch (error) {
+        console.error("Error creando tópico:", error);
+        alert("No se pudo crear el tópico.\n\n" + error.message);
+        addTopicBtn.disabled = false;
+      }
+    };
+  }
+
+
+  document
+    .querySelectorAll("[data-topic-action]")
+    .forEach(button => {
+      button.onclick = async () => {
+        const action = button.dataset.topicAction;
+        const topicKey = button.dataset.topicKey;
+        const topic = getDynamicTopics().find(item => item.key === topicKey);
+
+        if (!topic) return;
+
+        if (action === "rename") {
+          const newLabel = prompt("Nuevo nombre del tópico:", topic.label);
+          const cleanLabel = String(newLabel || "").trim();
+
+          if (!cleanLabel || cleanLabel === topic.label) return;
+
+          try {
+            const { data, error } = await supabaseClient.rpc(
+              "rename_topic",
+              {
+                p_retro_id: state.retroId,
+                p_session_id: state.participantSessionId,
+                p_topic_key: topicKey,
+                p_new_label: cleanLabel
+              }
+            );
+
+            if (error) throw error;
+            if (!data?.success) throw new Error(data?.message || "No se pudo renombrar el tópico.");
+
+            await loadTopics();
+            render();
+          } catch (error) {
+            console.error("Error renombrando tópico:", error);
+            alert("No se pudo renombrar el tópico.\n\n" + error.message);
+          }
+
+          return;
+        }
+
+        if (action === "delete") {
+          const confirmed = confirm(
+            `¿Eliminar el tópico "${topic.label}"?\n\nLas tarjetas asignadas quedarán como \"Sin agrupar\".`
+          );
+
+          if (!confirmed) return;
+
+          try {
+            const { data, error } = await supabaseClient.rpc(
+              "delete_topic",
+              {
+                p_retro_id: state.retroId,
+                p_session_id: state.participantSessionId,
+                p_topic_key: topicKey
+              }
+            );
+
+            if (error) throw error;
+            if (!data?.success) throw new Error(data?.message || "No se pudo eliminar el tópico.");
+
+            await loadTopics();
+            await loadCards();
+            render();
+          } catch (error) {
+            console.error("Error eliminando tópico:", error);
+            alert("No se pudo eliminar el tópico.\n\n" + error.message);
+          }
+        }
+      };
+    });
+
+
   document
     .querySelectorAll(".card-topic-select")
     .forEach(select => {
 
       select.onchange = async () => {
 
-        const cardId =
-          select.dataset.cardId;
-
-        const topicKey =
-          select.value || null;
+        const cardId = select.dataset.cardId;
+        const topicKey = select.value || null;
 
         select.disabled = true;
 
-
-        const {
-          data,
-          error
-        } = await supabaseClient
-          .from("cards")
-          .update({
-            topic_key: topicKey
-          })
-          .eq("id", cardId)
-          .select()
-          .single();
-
-
-        if (error) {
-
-          console.error(
-            "Error actualizando agrupación:",
-            error
+        try {
+          const { data, error } = await supabaseClient.rpc(
+            "set_card_topic",
+            {
+              p_retro_id: state.retroId,
+              p_session_id: state.participantSessionId,
+              p_card_id: cardId,
+              p_topic_key: topicKey
+            }
           );
 
-          alert(
-            "No se pudo actualizar el agrupamiento.\n\n" +
-            error.message
-          );
+          if (error) throw error;
+          if (!data?.success) throw new Error(data?.message || "No se pudo actualizar el agrupamiento.");
 
+          const index = state.cards.findIndex(card => card.id === cardId);
+          if (index !== -1) {
+            state.cards[index] = {
+              ...state.cards[index],
+              topic_key: topicKey
+            };
+          }
+
+          await loadTopics();
+          render();
+        } catch (error) {
+          console.error("Error actualizando agrupación:", error);
+          alert("No se pudo actualizar el agrupamiento.\n\n" + error.message);
           select.disabled = false;
-
-          return;
         }
-
-
-        console.log(
-          "Tarjeta agrupada:",
-          data
-        );
-
-
-        const index =
-          state.cards.findIndex(
-            card =>
-              card.id === cardId
-          );
-
-        if (index !== -1) {
-
-          state.cards[index] =
-            data;
-
-        }
-
-
-        render();
-
       };
-
     });
-
 
   // ===================================================
   // VOTACIÓN
@@ -4111,6 +4340,8 @@ async function initialize() {
 
   await loadCards();
 
+  await loadTopics();
+
   await loadActions();
 
   await loadVotes();
@@ -4129,6 +4360,8 @@ async function initialize() {
   subscribeToParticipants();
 
   subscribeToCards();
+
+  subscribeToTopics();
 
   subscribeToVotes();
 

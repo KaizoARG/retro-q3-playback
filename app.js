@@ -82,26 +82,78 @@ const steps = [
 
 
 // =====================================================
+// UTILIDADES
+// =====================================================
+
+function escapeHtml(value) {
+
+  if (value === null || value === undefined) {
+    return "";
+  }
+
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+
+// =====================================================
 // RENDER
 // =====================================================
 
 function render() {
 
-  document.querySelector("#stepLabel").textContent =
-    `${state.step + 1} / ${steps.length}`;
+  const stepLabel =
+    document.querySelector("#stepLabel");
 
-  document.querySelector("#progressBar").style.width =
-    `${((state.step + 1) / steps.length) * 100}%`;
+  const progressBar =
+    document.querySelector("#progressBar");
 
-  document.querySelector("#backBtn").style.visibility =
-    state.step === 0 ? "hidden" : "visible";
+  const backBtn =
+    document.querySelector("#backBtn");
 
-  document.querySelector("#nextBtn").textContent =
-    state.step === steps.length - 1
-      ? "Reiniciar ↻"
-      : (state.step === 0 ? "Comenzar →" : "Continuar →");
+  const nextBtn =
+    document.querySelector("#nextBtn");
 
-  document.querySelector("#app").innerHTML =
+  const app =
+    document.querySelector("#app");
+
+  if (!app) {
+    return;
+  }
+
+  if (stepLabel) {
+    stepLabel.textContent =
+      `${state.step + 1} / ${steps.length}`;
+  }
+
+  if (progressBar) {
+    progressBar.style.width =
+      `${((state.step + 1) / steps.length) * 100}%`;
+  }
+
+  if (backBtn) {
+    backBtn.style.visibility =
+      state.step === 0
+        ? "hidden"
+        : "visible";
+  }
+
+  if (nextBtn) {
+    nextBtn.textContent =
+      state.step === steps.length - 1
+        ? "Reiniciar ↻"
+        : (
+            state.step === 0
+              ? "Comenzar →"
+              : "Continuar →"
+          );
+  }
+
+  app.innerHTML =
     screens[state.step]();
 
   bind();
@@ -166,7 +218,9 @@ const screens = [
 
   () => `<section>
 
-    <div class="eyebrow">Check-in</div>
+    <div class="eyebrow">
+      Check-in
+    </div>
 
     <h2>
       ¿Con qué energía llegás?
@@ -179,8 +233,8 @@ const screens = [
 
     <div class="choice-row">
 
-      ${["😣","😕","😐","🙂","🚀"]
-        .map((x,i) =>
+      ${["😣", "😕", "😐", "🙂", "🚀"]
+        .map((x, i) =>
           `<button
             class="choice ${state.energy === i ? "selected" : ""}"
             data-energy="${i}">
@@ -200,7 +254,9 @@ const screens = [
 
   () => `<section>
 
-    <div class="eyebrow">Cosecha</div>
+    <div class="eyebrow">
+      Cosecha
+    </div>
 
     <h2>
       ¿Qué pasó durante este período?
@@ -277,7 +333,7 @@ const screens = [
             .filter(c => c.etapa === "green")
             .map(c => `
               <div class="sticky">
-                ${c.contenido}
+                ${escapeHtml(c.contenido)}
               </div>
             `)
             .join("")
@@ -309,7 +365,7 @@ const screens = [
             .filter(c => c.etapa === "red")
             .map(c => `
               <div class="sticky">
-                ${c.contenido}
+                ${escapeHtml(c.contenido)}
               </div>
             `)
             .join("")
@@ -341,7 +397,7 @@ const screens = [
             .filter(c => c.etapa === "blue")
             .map(c => `
               <div class="sticky">
-                ${c.contenido}
+                ${escapeHtml(c.contenido)}
               </div>
             `)
             .join("")
@@ -382,15 +438,15 @@ const screens = [
         "Priorización y foco",
         "Visibilidad de métricas"
       ]
-      .map((x,i) =>
+      .map((x, i) =>
         `<div class="topic">
 
           <strong>
-            ${x}
+            ${escapeHtml(x)}
           </strong>
 
           <span class="badge">
-            ${[6,5,4,3][i]} tarjetas
+            ${[6, 5, 4, 3][i]} tarjetas
           </span>
 
         </div>`
@@ -409,7 +465,11 @@ const screens = [
 
     const usedVotes =
       Object.values(state.myVotes)
-        .reduce((sum, value) => sum + value, 0);
+        .reduce(
+          (sum, value) =>
+            sum + value,
+          0
+        );
 
     const remainingVotes =
       Math.max(
@@ -437,9 +497,11 @@ const screens = [
         style="margin:20px 0">
 
         Te quedan
+
         <strong>
           ${remainingVotes}
         </strong>
+
         voto${remainingVotes === 1 ? "" : "s"}
 
       </div>
@@ -464,24 +526,28 @@ const screens = [
                 <div>
 
                   <strong>
-                    ${topic.label}
+                    ${escapeHtml(topic.label)}
                   </strong>
 
                   <div class="badge">
+
                     ${totalVotes}
+
                     voto${totalVotes === 1 ? "" : "s"}
+
                     ${
                       myVotes > 0
                         ? ` · vos: ${myVotes}`
                         : ""
                     }
+
                   </div>
 
                 </div>
 
                 <button
                   class="primary vote"
-                  data-topic="${topic.key}"
+                  data-topic="${escapeHtml(topic.key)}"
                   ${disabled ? "disabled" : ""}>
 
                   ${
@@ -513,7 +579,7 @@ const screens = [
       voteTopics
         .slice()
         .sort(
-          (a,b) =>
+          (a, b) =>
             (state.votes[b.key] || 0) -
             (state.votes[a.key] || 0)
         )[0];
@@ -530,14 +596,22 @@ const screens = [
       </div>
 
       <h2>
-        ${topTopic ? topTopic.label : "Tema principal"}
+        ${
+          topTopic
+            ? escapeHtml(topTopic.label)
+            : "Tema principal"
+        }
       </h2>
 
       <p class="lead">
-        Este tema recibió ${topTopicVotes}
+
+        Este tema recibió
+        ${topTopicVotes}
         voto${topTopicVotes === 1 ? "" : "s"}.
+
         La pregunta ahora no es solamente qué pasó,
         sino qué hay detrás.
+
       </p>
 
       <div
@@ -625,25 +699,37 @@ const screens = [
     <div class="actions">
 
       ${
-        state.actions
-          .map(a =>
-            `<div class="action">
+        state.actions.length === 0
 
-              <div>
+          ? `
+            <div class="card" style="margin-top:20px">
+              <p>
+                Todavía no hay acciones registradas.
+              </p>
+            </div>
+          `
 
-                <strong>
-                  ${a.text}
-                </strong>
+          : state.actions
+              .map(a =>
+                `<div class="action">
 
-                <div class="badge">
-                  ${a.owner} · ${a.date}
-                </div>
+                  <div>
 
-              </div>
+                    <strong>
+                      ${escapeHtml(a.text)}
+                    </strong>
 
-            </div>`
-          )
-          .join("")
+                    <div class="badge">
+                      ${escapeHtml(a.owner)}
+                      ·
+                      ${escapeHtml(a.date)}
+                    </div>
+
+                  </div>
+
+                </div>`
+              )
+              .join("")
       }
 
     </div>
@@ -659,14 +745,16 @@ const screens = [
 
     const lastAction =
       state.actions.length > 0
-        ? state.actions[state.actions.length - 1]
+        ? state.actions[
+            state.actions.length - 1
+          ]
         : null;
 
     const topTopic =
       voteTopics
         .slice()
         .sort(
-          (a,b) =>
+          (a, b) =>
             (state.votes[b.key] || 0) -
             (state.votes[a.key] || 0)
         )[0];
@@ -699,19 +787,23 @@ const screens = [
           </div>
 
           <h3>
+
             ${
               topTopic
-                ? topTopic.label
+                ? escapeHtml(topTopic.label)
                 : "Todavía no hay votos"
             }
+
           </h3>
 
           <p>
+
             ${
               topTopic
                 ? `${state.votes[topTopic.key] || 0} votos`
                 : "Votá un tema para definirlo."
             }
+
           </p>
 
         </div>
@@ -724,19 +816,27 @@ const screens = [
           </div>
 
           <h3>
+
             ${
               lastAction
-                ? lastAction.text
+                ? escapeHtml(lastAction.text)
                 : "Todavía no hay acciones"
             }
+
           </h3>
 
           <p>
+
             ${
               lastAction
-                ? `${lastAction.owner} · ${lastAction.date}`
+                ? `
+                  ${escapeHtml(lastAction.owner)}
+                  ·
+                  ${escapeHtml(lastAction.date)}
+                `
                 : "Agregá una acción para verla acá."
             }
+
           </p>
 
         </div>
@@ -785,7 +885,8 @@ async function loadRetro() {
     return false;
   }
 
-  state.retroId = data.id;
+  state.retroId =
+    data.id;
 
   console.log(
     "Retro cargada:",
@@ -821,7 +922,8 @@ async function loadCards() {
     return;
   }
 
-  state.cards = data || [];
+  state.cards =
+    data || [];
 
   console.log(
     "Tarjetas cargadas:",
@@ -856,21 +958,25 @@ async function loadActions() {
   }
 
   state.actions =
-    (data || []).map(action => ({
+    (data || []).map(
+      action => ({
 
-      id:
-        action.id,
+        id:
+          action.id,
 
-      text:
-        action.descripcion,
+        text:
+          action.descripcion,
 
-      owner:
-        action.responsable,
+        owner:
+          action.responsable ||
+          "Por definir",
 
-      date:
-        action.fecha || "Por definir"
+        date:
+          action.fecha ||
+          "Por definir"
 
-    }));
+      })
+    );
 
   console.log(
     "Acciones cargadas:",
@@ -903,12 +1009,16 @@ async function loadVotes() {
 
   state.votes = {};
 
-  (data || []).forEach(row => {
+  (data || []).forEach(
+    row => {
 
-    state.votes[row.topic_key] =
-      row.votos || 0;
+      state.votes[
+        row.topic_key
+      ] =
+        row.votos || 0;
 
-  });
+    }
+  );
 
   console.log(
     "Votos cargados:",
@@ -933,7 +1043,9 @@ function loadMyVotes() {
   try {
 
     const saved =
-      localStorage.getItem(storageKey);
+      localStorage.getItem(
+        storageKey
+      );
 
     state.myVotes =
       saved
@@ -963,12 +1075,18 @@ function loadMyVotes() {
 
 function saveMyVotes() {
 
+  if (!state.retroId) {
+    return;
+  }
+
   const storageKey =
     `retro-my-votes-${state.retroId}`;
 
   localStorage.setItem(
     storageKey,
-    JSON.stringify(state.myVotes)
+    JSON.stringify(
+      state.myVotes
+    )
   );
 }
 
@@ -1003,33 +1121,41 @@ function subscribeToCards() {
           payload.new
         );
 
+        if (!payload.new) {
+          return;
+        }
+
         const exists =
           state.cards.some(
             card =>
-              card.id === payload.new.id
+              card.id ===
+              payload.new.id
           );
 
-        if (!exists) {
+        if (exists) {
+          return;
+        }
 
-          state.cards.push(
-            payload.new
-          );
+        state.cards.push(
+          payload.new
+        );
 
-          if (state.step === 2) {
-            render();
-          }
+        if (state.step === 2) {
+          render();
         }
       }
     )
 
-    .subscribe((status) => {
+    .subscribe(
+      (status) => {
 
-      console.log(
-        "Realtime cards:",
-        status
-      );
+        console.log(
+          "Realtime cards:",
+          status
+        );
 
-    });
+      }
+    );
 }
 
 
@@ -1070,7 +1196,9 @@ function subscribeToVotes() {
           return;
         }
 
-        state.votes[row.topic_key] =
+        state.votes[
+          row.topic_key
+        ] =
           row.votos || 0;
 
         if (
@@ -1084,14 +1212,111 @@ function subscribeToVotes() {
       }
     )
 
-    .subscribe((status) => {
+    .subscribe(
+      (status) => {
 
-      console.log(
-        "Realtime votos:",
-        status
-      );
+        console.log(
+          "Realtime votos:",
+          status
+        );
 
-    });
+      }
+    );
+}
+
+
+// =====================================================
+// REALTIME - ACCIONES
+// =====================================================
+
+function subscribeToActions() {
+
+  supabaseClient
+
+    .channel(
+      "actions-realtime-" +
+      state.retroId
+    )
+
+    .on(
+      "postgres_changes",
+      {
+        event: "INSERT",
+        schema: "public",
+        table: "acciones",
+        filter:
+          `retro_id=eq.${state.retroId}`
+      },
+
+      (payload) => {
+
+        console.log(
+          "Nueva acción recibida:",
+          payload.new
+        );
+
+        if (!payload.new) {
+          return;
+        }
+
+        const exists =
+          state.actions.some(
+            action =>
+              action.id ===
+              payload.new.id
+          );
+
+        // Evita duplicar la acción.
+        // Esto ocurre porque quien crea
+        // la acción también la agrega localmente.
+        if (exists) {
+          return;
+        }
+
+        const newAction = {
+
+          id:
+            payload.new.id,
+
+          text:
+            payload.new.descripcion,
+
+          owner:
+            payload.new.responsable ||
+            "Por definir",
+
+          date:
+            payload.new.fecha ||
+            "Por definir"
+
+        };
+
+        state.actions.push(
+          newAction
+        );
+
+        // Solo necesitamos refrescar
+        // las pantallas que muestran acciones.
+        if (
+          state.step === 6 ||
+          state.step === 7
+        ) {
+          render();
+        }
+
+      }
+    )
+
+    .subscribe(
+      (status) => {
+
+        console.log(
+          "Realtime acciones:",
+          status
+        );
+
+      }
+    );
 }
 
 
@@ -1099,7 +1324,7 @@ function subscribeToVotes() {
 // EVENTOS
 // =====================================================
 
-async function bind() {
+function bind() {
 
 
   // ===================================================
@@ -1107,19 +1332,25 @@ async function bind() {
   // ===================================================
 
   document
-    .querySelectorAll("[data-energy]")
-    .forEach(b => {
+    .querySelectorAll(
+      "[data-energy]"
+    )
+    .forEach(
+      button => {
 
-      b.onclick = () => {
+        button.onclick = () => {
 
-        state.energy =
-          +b.dataset.energy;
+          state.energy =
+            Number(
+              button.dataset.energy
+            );
 
-        render();
+          render();
 
-      };
+        };
 
-    });
+      }
+    );
 
 
   // ===================================================
@@ -1128,99 +1359,120 @@ async function bind() {
 
   document
     .querySelectorAll(".vote")
-    .forEach(b => {
+    .forEach(
+      button => {
 
-      b.onclick = async () => {
+        button.onclick =
+          async () => {
 
-        const topicKey =
-          b.dataset.topic;
+            const topicKey =
+              button.dataset.topic;
 
-        const usedVotes =
-          Object.values(state.myVotes)
-            .reduce(
-              (sum, value) =>
-                sum + value,
-              0
+            const usedVotes =
+              Object.values(
+                state.myVotes
+              )
+              .reduce(
+                (sum, value) =>
+                  sum + value,
+                0
+              );
+
+            if (
+              usedVotes >=
+              MAX_VOTES_PER_PARTICIPANT
+            ) {
+
+              alert(
+                "Ya utilizaste tus 3 votos."
+              );
+
+              return;
+            }
+
+
+            // -----------------------------------------
+            // Incrementar voto en Supabase
+            // -----------------------------------------
+
+            button.disabled =
+              true;
+
+            const {
+              data,
+              error
+            } =
+              await supabaseClient
+                .rpc(
+                  "increment_vote",
+                  {
+                    p_retro_id:
+                      state.retroId,
+
+                    p_topic_key:
+                      topicKey
+                  }
+                );
+
+            if (error) {
+
+              console.error(
+                "Error guardando voto:",
+                error
+              );
+
+              alert(
+                "No se pudo registrar el voto.\n\n" +
+                error.message
+              );
+
+              render();
+
+              return;
+            }
+
+
+            console.log(
+              "Voto guardado:",
+              data
             );
 
-        if (
-          usedVotes >=
-          MAX_VOTES_PER_PARTICIPANT
-        ) {
 
-          alert(
-            "Ya utilizaste tus 3 votos."
-          );
+            // -----------------------------------------
+            // Actualizar votos locales
+            // -----------------------------------------
 
-          return;
-        }
-
-
-        // ---------------------------------------------
-        // Incrementar voto en Supabase
-        // ---------------------------------------------
-
-        const { data, error } =
-          await supabaseClient
-            .rpc(
-              "increment_vote",
-              {
-                p_retro_id:
-                  state.retroId,
-
-                p_topic_key:
+            state.myVotes[
+              topicKey
+            ] =
+              (
+                state.myVotes[
                   topicKey
-              }
-            );
+                ] || 0
+              ) + 1;
 
-        if (error) {
-
-          console.error(
-            "Error guardando voto:",
-            error
-          );
-
-          alert(
-            "No se pudo registrar el voto.\n\n" +
-            error.message
-          );
-
-          return;
-        }
+            saveMyVotes();
 
 
-        console.log(
-          "Voto guardado:",
-          data
-        );
+            // -----------------------------------------
+            // Actualizar contador global
+            // -----------------------------------------
 
+            if (data) {
 
-        // ---------------------------------------------
-        // Actualizar votos locales del participante
-        // ---------------------------------------------
+              state.votes[
+                data.topic_key
+              ] =
+                data.votos;
 
-        state.myVotes[topicKey] =
-          (state.myVotes[topicKey] || 0) + 1;
+            }
 
-        saveMyVotes();
+            render();
 
+          };
 
-        // ---------------------------------------------
-        // Actualizar contador global inmediatamente
-        // ---------------------------------------------
-
-        if (data) {
-
-          state.votes[data.topic_key] =
-            data.votos;
-
-        }
-
-        render();
-
-      };
-
-    });
+      }
+    );
 
 
   // ===================================================
@@ -1228,81 +1480,119 @@ async function bind() {
   // ===================================================
 
   const addCard =
-    document.querySelector("#addCard");
+    document.querySelector(
+      "#addCard"
+    );
 
   if (addCard) {
 
-    addCard.onclick = async () => {
+    addCard.onclick =
+      async () => {
 
-      const text =
-        document
-          .querySelector("#cardText")
-          .value
-          .trim();
+        const textInput =
+          document.querySelector(
+            "#cardText"
+          );
 
-      const type =
-        document
-          .querySelector("#cardType")
-          .value;
+        const typeInput =
+          document.querySelector(
+            "#cardType"
+          );
 
-      if (!text) {
+        if (!textInput || !typeInput) {
+          return;
+        }
 
-        alert(
-          "Escribí algo antes de agregar la tarjeta."
-        );
+        const text =
+          textInput.value.trim();
 
-        return;
-      }
+        const type =
+          typeInput.value;
 
-      const { data, error } =
-        await supabaseClient
-          .from("cards")
-          .insert({
-            contenido: text,
-            etapa: type,
-            retro_id: state.retroId
-          })
-          .select()
-          .single();
+        if (!text) {
 
-      if (error) {
+          alert(
+            "Escribí algo antes de agregar la tarjeta."
+          );
 
-        console.error(
-          "Error guardando tarjeta:",
+          textInput.focus();
+
+          return;
+        }
+
+
+        addCard.disabled =
+          true;
+
+        addCard.textContent =
+          "Guardando...";
+
+
+        const {
+          data,
           error
-        );
+        } =
+          await supabaseClient
+            .from("cards")
+            .insert({
+              contenido:
+                text,
 
-        alert(
-          "No se pudo guardar la tarjeta.\n\n" +
-          error.message
-        );
+              etapa:
+                type,
 
-        return;
-      }
-
-      console.log(
-        "Tarjeta guardada:",
-        data
-      );
+              retro_id:
+                state.retroId
+            })
+            .select()
+            .single();
 
 
-      const exists =
-        state.cards.some(
-          card =>
-            card.id === data.id
-        );
+        if (error) {
 
-      if (!exists) {
+          console.error(
+            "Error guardando tarjeta:",
+            error
+          );
 
-        state.cards.push(
+          alert(
+            "No se pudo guardar la tarjeta.\n\n" +
+            error.message
+          );
+
+          addCard.disabled =
+            false;
+
+          addCard.textContent =
+            "Agregar tarjeta +";
+
+          return;
+        }
+
+
+        console.log(
+          "Tarjeta guardada:",
           data
         );
 
-      }
 
-      render();
+        const exists =
+          state.cards.some(
+            card =>
+              card.id === data.id
+          );
 
-    };
+        if (!exists) {
+
+          state.cards.push(
+            data
+          );
+
+        }
+
+        render();
+
+      };
 
   }
 
@@ -1311,139 +1601,163 @@ async function bind() {
   // ACCIONES
   // ===================================================
 
-  const add =
-    document.querySelector("#addAction");
+  const addAction =
+    document.querySelector(
+      "#addAction"
+    );
 
-  if (add) {
+  if (addAction) {
 
-    add.onclick = async () => {
+    addAction.onclick =
+      async () => {
 
-      const t =
-        document
-          .querySelector("#actionText")
-          .value
-          .trim();
+        const textInput =
+          document.querySelector(
+            "#actionText"
+          );
 
-      if (!t) {
+        const ownerInput =
+          document.querySelector(
+            "#actionOwner"
+          );
 
-        alert(
-          "Escribí una acción."
+        const dateInput =
+          document.querySelector(
+            "#actionDate"
+          );
+
+        if (
+          !textInput ||
+          !ownerInput ||
+          !dateInput
+        ) {
+          return;
+        }
+
+
+        const text =
+          textInput.value.trim();
+
+        if (!text) {
+
+          alert(
+            "Escribí una acción."
+          );
+
+          textInput.focus();
+
+          return;
+        }
+
+
+        const owner =
+          ownerInput.value.trim()
+          || "Por definir";
+
+
+        const date =
+          dateInput.value
+          || null;
+
+
+        // ---------------------------------------------
+        // Guardar acción en Supabase
+        // ---------------------------------------------
+
+        addAction.disabled =
+          true;
+
+        addAction.textContent =
+          "Guardando...";
+
+
+        const {
+          data,
+          error
+        } =
+          await supabaseClient
+            .from("acciones")
+            .insert({
+
+              descripcion:
+                text,
+
+              responsable:
+                owner,
+
+              fecha:
+                date,
+
+              retro_id:
+                state.retroId
+
+            })
+            .select()
+            .single();
+
+
+        if (error) {
+
+          console.error(
+            "ERROR SUPABASE",
+            error
+          );
+
+          alert(
+            "No se pudo guardar la acción.\n\n" +
+            "Code: " +
+            (error?.code || "N/A") +
+            "\n\nMessage: " +
+            (error?.message || "N/A")
+          );
+
+          addAction.disabled =
+            false;
+
+          addAction.textContent =
+            "Agregar acción +";
+
+          return;
+        }
+
+
+        console.log(
+          "Acción guardada en Supabase:",
+          data
         );
 
-        return;
-      }
+
+        // ---------------------------------------------
+        // Agregar al estado local
+        // ---------------------------------------------
+
+        const newAction = {
+
+          id:
+            data.id,
+
+          text:
+            data.descripcion,
+
+          owner:
+            data.responsable ||
+            "Por definir",
+
+          date:
+            data.fecha ||
+            "Por definir"
+
+        };
 
 
-      const owner =
-        document
-          .querySelector("#actionOwner")
-          .value
-          .trim()
-        || "Por definir";
-
-
-      const date =
-        document
-          .querySelector("#actionDate")
-          .value
-        || null;
-
-
-      // =================================================
-      // GUARDAR ACCIÓN EN SUPABASE
-      // =================================================
-
-      const { data, error } =
-        await supabaseClient
-          .from("acciones")
-          .insert({
-            descripcion: t,
-            responsable: owner,
-            fecha: date,
-            retro_id: state.retroId
-          })
-          .select()
-          .single();
-
-
-      if (error) {
-
-        console.error(
-          "ERROR SUPABASE"
+        state.actions.push(
+          newAction
         );
 
-        console.error(
-          "code:",
-          error?.code
-        );
 
-        console.error(
-          "message:",
-          error?.message
-        );
-
-        console.error(
-          "details:",
-          error?.details
-        );
-
-        console.error(
-          "hint:",
-          error?.hint
-        );
-
-        alert(
-          "ERROR SUPABASE\n\n" +
-
-          "Code: " +
-          (error?.code || "N/A") +
-
-          "\nMessage: " +
-          (error?.message || "N/A") +
-
-          "\nDetails: " +
-          (error?.details || "N/A")
-        );
-
-        return;
-      }
-
-
-      console.log(
-        "Acción guardada en Supabase:",
-        data
-      );
-
-
-      // =================================================
-      // AGREGAR AL ESTADO LOCAL
-      // =================================================
-
-      const newAction = {
-
-        id:
-          data.id,
-
-        text:
-          data.descripcion,
-
-        owner:
-          data.responsable,
-
-        date:
-          data.fecha || "Por definir"
+        render();
 
       };
-
-
-      state.actions.push(
-        newAction
-      );
-
-
-      render();
-
-    };
 
   }
 
@@ -1454,55 +1768,79 @@ async function bind() {
 // BOTÓN SIGUIENTE
 // =====================================================
 
-document
-  .querySelector("#nextBtn")
-  .onclick = () => {
+const nextBtn =
+  document.querySelector(
+    "#nextBtn"
+  );
 
-    if (
-      state.step ===
-      steps.length - 1
-    ) {
+if (nextBtn) {
 
-      state.step = 0;
+  nextBtn.onclick =
+    async () => {
 
-      state.energy = null;
+      // -----------------------------------------------
+      // Si estamos en Cierre → reiniciar navegación
+      // -----------------------------------------------
 
-      state.votes = {};
+      if (
+        state.step ===
+        steps.length - 1
+      ) {
 
-      loadVotes();
+        state.step = 0;
 
-      render();
+        state.energy =
+          null;
 
-    }
+        // No borramos votos ni acciones
+        // porque están persistidos en Supabase.
 
-    else {
+        await loadVotes();
+
+        await loadActions();
+
+        render();
+
+        return;
+      }
+
 
       state.step++;
 
       render();
 
-    }
+    };
 
-  };
+}
 
 
 // =====================================================
 // BOTÓN ATRÁS
 // =====================================================
 
-document
-  .querySelector("#backBtn")
-  .onclick = () => {
+const backBtn =
+  document.querySelector(
+    "#backBtn"
+  );
 
-    if (state.step > 0) {
+if (backBtn) {
 
-      state.step--;
+  backBtn.onclick =
+    () => {
 
-      render();
+      if (
+        state.step > 0
+      ) {
 
-    }
+        state.step--;
 
-  };
+        render();
+
+      }
+
+    };
+
+}
 
 
 // =====================================================
@@ -1510,6 +1848,15 @@ document
 // =====================================================
 
 async function initialize() {
+
+  console.log(
+    "Inicializando retro..."
+  );
+
+
+  // -----------------------------------------------
+  // 1. Cargar retro
+  // -----------------------------------------------
 
   const retroLoaded =
     await loadRetro();
@@ -1519,25 +1866,40 @@ async function initialize() {
   }
 
 
-  await loadCards();
+  // -----------------------------------------------
+  // 2. Cargar información persistida
+  // -----------------------------------------------
 
+  await loadCards();
 
   await loadActions();
 
-
   await loadVotes();
-
 
   loadMyVotes();
 
 
-  subscribeToCards();
+  // -----------------------------------------------
+  // 3. Activar realtime
+  // -----------------------------------------------
 
+  subscribeToCards();
 
   subscribeToVotes();
 
+  subscribeToActions();
+
+
+  // -----------------------------------------------
+  // 4. Mostrar aplicación
+  // -----------------------------------------------
 
   render();
+
+
+  console.log(
+    "Retro inicializada correctamente."
+  );
 
 }
 

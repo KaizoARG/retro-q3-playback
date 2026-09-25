@@ -23,6 +23,8 @@ console.log("Código de retro:", RETRO_CODE);
 // ESTADO
 // =====================================================
 
+let suppressCardRealtime = false;
+
 const state = {
   step: 0,
   energy: null,
@@ -3002,6 +3004,11 @@ function subscribeToCards() {
 
       payload => {
 
+        if (suppressCardRealtime) {
+          console.log("Realtime cards ignorado durante generación de tópicos:", payload);
+          return;
+        }
+
         console.log(
           "Cambio en tarjeta:",
           payload
@@ -3464,50 +3471,98 @@ async function bind() {
 
         console.log("Iniciando generación de tópicos", {
           cards: state.cards.length,
-          updates
+          updates,
+          candidates: candidates.map(topic => topic.label)
         });
 
-        let updatedCount = 0;
+        // Bloqueamos el realtime de cards durante esta operación para que
+        // una actualización intermedia no vuelva a pintar datos viejos.
+        suppressCardRealtime = true;
 
-        for (const update of updates) {
-          const { data, error } = await supabaseClient
+        // Pintado optimista: la pantalla muestra inmediatamente la agrupación
+        // que acabamos de generar, incluso antes de terminar la persistencia.
+        state.cards = state.cards.map(card => ({
+          ...card,
+          topic_key: assignments.get(card.id)?.key || null
+        }));
+        render();
+
+        const results = await Promise.all(
+          updates.map(async update => {
+            const { data, error } = await supabaseClient
+              .from("cards")
+              .update({ topic_key: update.topic_key })
+              .eq("id", update.id)
+              .eq("retro_id", state.retroId)
+              .select("id, topic_key");
+
+            if (error) throw error;
+
+            if (!data || data.length === 0) {
+              throw new Error(
+                `No se pudo actualizar la tarjeta ${update.id}. Verificá las políticas de acceso (RLS) de la tabla cards.`
+              );
+            }
+
+            return data[0];
+          })
+        );
+
+        console.log("Actualizaciones confirmadas por Supabase:", results);
+
+        // Verificación final contra la base antes de considerar terminada
+        // la agrupación.
+        const { data: verifiedCards, error: verifyError } =
+          await supabaseClient
             .from("cards")
-            .update({ topic_key: update.topic_key })
-            .eq("id", update.id)
-            .eq("retro_id", state.retroId)
-            .select("id, topic_key");
+            .select("id, topic_key")
+            .eq("retro_id", state.retroId);
 
-          if (error) throw error;
+        if (verifyError) throw verifyError;
 
-          if (!data || data.length === 0) {
-            throw new Error(
-              `No se pudo actualizar la tarjeta ${update.id}. Verificá las políticas de acceso (RLS) de la tabla cards.`
-            );
-          }
+        const missing = updates.filter(update => {
+          const row = verifiedCards?.find(card => card.id === update.id);
+          return !row || row.topic_key !== update.topic_key;
+        });
 
-          updatedCount += data.length;
+        if (missing.length) {
+          throw new Error(
+            `La base no confirmó ${missing.length} agrupación${missing.length === 1 ? "" : "es"}. Revisá RLS/permisos de UPDATE en cards.`
+          );
         }
 
-        await loadCards();
+        // Usamos la respuesta verificada para el render definitivo.
+        state.cards = state.cards.map(card => {
+          const fresh = verifiedCards.find(row => row.id === card.id);
+          return fresh ? { ...card, topic_key: fresh.topic_key } : card;
+        });
+
         render();
 
         console.log("Tópicos generados:", candidates.map(topic => topic.label));
-        console.log(`Tarjetas actualizadas: ${updatedCount}/${updates.length}`);
+        console.log(`Tarjetas actualizadas: ${results.length}/${updates.length}`);
+        console.log("Cards verificadas:", verifiedCards);
 
-        // Feedback visible para el facilitador.
         alert(
           `Agrupación generada correctamente\n\n` +
           `${candidates.length} tópicos\n` +
-          `${updatedCount} tarjetas agrupadas`
+          `${results.length} tarjetas agrupadas`
         );
       } catch (error) {
         console.error("Error generando tópicos:", error);
+
+        // Si falló la persistencia, recuperamos el estado real de Supabase.
+        await loadCards();
+        render();
+
         alert(
           "No se pudo generar la agrupación.\n\n" +
           error.message
         );
+      } finally {
+        suppressCardRealtime = false;
         generateTopicsBtn.disabled = false;
-        generateTopicsBtn.textContent = "Generar tópicos";
+        generateTopicsBtn.textContent = "Regenerar tópicos";
       }
     };
   }

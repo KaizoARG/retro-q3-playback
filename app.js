@@ -16,8 +16,7 @@ const urlParams = new URLSearchParams(window.location.search);
 const RETRO_CODE =
   urlParams.get("retro") || null;
 
-console.log("Código de retro:", RETRO_CODE);
-
+console.log("Código de retro:", RETRO_CODE);\n\n// =====================================================\n// FLOW-INSPIRED VISUAL THEME\n// =====================================================\n\nfunction injectFlowTheme() {\n  if (document.getElementById("flowRetroTheme")) return;\n\n  const style = document.createElement("style");\n  style.id = "flowRetroTheme";\n  style.textContent = `\n    :root {\n      --flow-bg: #050505;\n      --flow-surface: #101010;\n      --flow-surface-2: #171717;\n      --flow-border: rgba(255,255,255,.10);\n      --flow-text: #f7f7f7;\n      --flow-muted: rgba(247,247,247,.68);\n      --flow-cyan: #54FFD1;\n      --flow-cyan-soft: rgba(84,255,209,.12);\n      --flow-radius: 18px;\n    }\n\n    html, body {\n      background:\n        radial-gradient(circle at 80% -10%, rgba(84,255,209,.10), transparent 30%),\n        radial-gradient(circle at 10% 20%, rgba(84,255,209,.045), transparent 25%),\n        var(--flow-bg) !important;\n      color: var(--flow-text) !important;\n    }\n\n    body {\n      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;\n    }\n\n    #app {\n      min-height: 100vh;\n    }\n\n    .flow-page {\n      min-height: 100vh;\n      background: linear-gradient(180deg, rgba(255,255,255,.018), transparent 24%);\n    }\n\n    .flow-topbar {\n      position: sticky;\n      top: 0;\n      z-index: 50;\n      height: 72px;\n      display: flex;\n      align-items: center;\n      justify-content: space-between;\n      padding: 0 clamp(20px, 4vw, 64px);\n      background: rgba(5,5,5,.78);\n      border-bottom: 1px solid rgba(255,255,255,.07);\n      backdrop-filter: blur(18px);\n    }\n\n    .flow-brand {\n      display: flex;\n      align-items: center;\n      gap: 13px;\n      font-weight: 800;\n      letter-spacing: -.04em;\n    }\n\n    .flow-logo {\n      font-size: 31px;\n      line-height: 1;\n      color: var(--flow-cyan);\n      letter-spacing: -.08em;\n    }\n\n    .flow-brand-divider {\n      width: 1px;\n      height: 22px;\n      background: rgba(255,255,255,.18);\n    }\n\n    .flow-brand-name {\n      font-size: 13px;\n      letter-spacing: .10em;\n      text-transform: uppercase;\n      opacity: .72;\n    }\n\n    .flow-topbar-dot {\n      width: 8px;\n      height: 8px;\n      border-radius: 999px;\n      background: var(--flow-cyan);\n      box-shadow: 0 0 18px rgba(84,255,209,.55);\n    }\n\n    .flow-hero {\n      position: relative;\n      overflow: hidden;\n      padding: clamp(70px, 10vw, 130px) clamp(20px, 4vw, 64px) 70px !important;\n      max-width: 1320px !important;\n    }\n\n    .flow-hero::after {\n      content: "";\n      position: absolute;\n      width: 520px;\n      height: 520px;\n      right: -180px;\n      top: -180px;\n      border-radius: 50%;\n      background: radial-gradient(circle, rgba(84,255,209,.16), transparent 68%);\n      pointer-events: none;\n    }\n\n    .flow-eyebrow {\n      color: var(--flow-cyan) !important;\n      font-size: 12px !important;\n      font-weight: 800 !important;\n      letter-spacing: .13em !important;\n      text-transform: uppercase !important;\n    }\n\n    .flow-title {\n      max-width: 900px;\n      font-size: clamp(48px, 7vw, 88px) !important;\n      line-height: .98 !important;\n      letter-spacing: -.055em !important;\n      margin: 18px 0 22px !important;\n    }\n\n    .flow-subtitle {\n      max-width: 760px;\n      color: var(--flow-muted) !important;\n      font-size: clamp(18px, 2vw, 23px) !important;\n      line-height: 1.55 !important;\n    }\n\n    .flow-section {\n      max-width: 1320px;\n      margin: 0 auto;\n      padding: 0 clamp(20px, 4vw, 64px) 80px;\n    }\n\n    .flow-section-title {\n      font-size: clamp(28px, 4vw, 42px);\n      letter-spacing: -.035em;\n      margin: 0;\n    }\n\n    .flow-feature-grid {\n      display: grid;\n      grid-template-columns: repeat(3, minmax(0, 1fr));\n      gap: 16px;\n    }\n\n    .flow-feature-card {\n      position: relative;\n      min-height: 190px;\n      padding: 26px;\n      border-radius: var(--flow-radius);\n      border: 1px solid var(--flow-border);\n      background: linear-gradient(145deg, rgba(255,255,255,.075), rgba(255,255,255,.025));\n      box-shadow: 0 20px 70px rgba(0,0,0,.18);\n      transition: transform .18s ease, border-color .18s ease, background .18s ease;\n    }\n\n    .flow-feature-card:hover {\n      transform: translateY(-3px);\n      border-color: rgba(84,255,209,.28);\n      background: linear-gradient(145deg, rgba(84,255,209,.09), rgba(255,255,255,.025));\n    }\n\n    .flow-feature-number {\n      color: var(--flow-cyan);\n      font-size: 12px;\n      font-weight: 800;\n      letter-spacing: .12em;\n    }\n\n    .flow-history {\n      border: 1px solid var(--flow-border);\n      border-radius: 24px;\n      background: rgba(255,255,255,.035);\n      padding: clamp(22px, 4vw, 38px);\n      box-shadow: 0 25px 90px rgba(0,0,0,.22);\n    }\n\n    .flow-history-row {\n      padding: 20px 0 !important;\n      border-bottom: 1px solid rgba(255,255,255,.08) !important;\n    }\n\n    .flow-history-row:last-child {\n      border-bottom: 0 !important;\n    }\n\n    .flow-history-code {\n      color: var(--flow-cyan);\n      font-size: 11px;\n      font-weight: 800;\n      letter-spacing: .10em;\n      text-transform: uppercase;\n      margin-bottom: 6px;\n    }\n\n    .card {\n      background: linear-gradient(145deg, rgba(255,255,255,.065), rgba(255,255,255,.025)) !important;\n      border: 1px solid var(--flow-border) !important;\n      border-radius: var(--flow-radius) !important;\n      box-shadow: 0 20px 70px rgba(0,0,0,.16);\n    }\n\n    button.primary {\n      background: var(--flow-cyan) !important;\n      color: #03110d !important;\n      border-color: transparent !important;\n      font-weight: 800 !important;\n      border-radius: 999px !important;\n      box-shadow: 0 8px 30px rgba(84,255,209,.16);\n    }\n\n    button.primary:hover:not(:disabled) {\n      transform: translateY(-1px);\n      box-shadow: 0 12px 36px rgba(84,255,209,.24);\n    }\n\n    button:not(.primary) {\n      border-radius: 999px !important;\n    }\n\n    input, textarea, select {\n      background: rgba(255,255,255,.045) !important;\n      border: 1px solid rgba(255,255,255,.14) !important;\n      border-radius: 12px !important;\n      color: #fff !important;\n      outline: none;\n    }\n\n    input:focus, textarea:focus, select:focus {\n      border-color: rgba(84,255,209,.60) !important;\n      box-shadow: 0 0 0 3px rgba(84,255,209,.09) !important;\n    }\n\n    .pill {\n      border-color: rgba(84,255,209,.28) !important;\n      background: rgba(84,255,209,.08) !important;\n      color: var(--flow-cyan) !important;\n      border-radius: 999px !important;\n    }\n\n    .badge {\n      border-color: rgba(255,255,255,.12) !important;\n      background: rgba(255,255,255,.035) !important;\n      border-radius: 999px !important;\n    }\n\n    .lead {\n      color: var(--flow-muted) !important;\n    }\n\n    .eyebrow {\n      color: var(--flow-cyan) !important;\n    }\n\n    .progress-container, #progressContainer {\n      background: rgba(255,255,255,.08) !important;\n    }\n\n    #progressBar {\n      background: var(--flow-cyan) !important;\n      box-shadow: 0 0 14px rgba(84,255,209,.30);\n    }\n\n    @media (max-width: 800px) {\n      .flow-feature-grid {\n        grid-template-columns: 1fr;\n      }\n      .flow-topbar {\n        height: 64px;\n      }\n      .flow-brand-name {\n        display: none;\n      }\n      .flow-title {\n        font-size: clamp(42px, 12vw, 64px) !important;\n      }\n    }\n  `;\n\n  document.head.appendChild(style);\n}\n
 
 // =====================================================
 // ESTADO
@@ -3191,35 +3190,67 @@ function landingShell(content) {
   if (progressBar) progressBar.style.width = "0%";
   if (backBtn) { backBtn.style.display = "none"; backBtn.disabled = true; }
   if (nextBtn) nextBtn.style.display = "none";
-  if (app) app.innerHTML = content;
+  if (app) {
+    app.innerHTML = `
+      <div class="flow-page">
+        <header class="flow-topbar">
+          <div class="flow-brand">
+            <span class="flow-logo">flow</span>
+            <span class="flow-brand-divider"></span>
+            <span class="flow-brand-name">Retrospectivas</span>
+          </div>
+          <span class="flow-topbar-dot" aria-hidden="true"></span>
+        </header>
+        ${content}
+      </div>
+    `;
+  }
 }
 
 function landingHome() {
   return `
-    <section style="max-width:1120px;margin:0 auto;padding:56px 20px 80px">
-      <div style="max-width:780px">
-        <div class="pill">ASISTENTE DE RETROSPECTIVAS</div>
-        <h1 style="font-size:clamp(42px,6vw,72px);line-height:1.02;margin:22px 0 18px">
-          Tu espacio para reflexionar, aprender y mejorar en equipo
-        </h1>
-        <p class="lead" style="font-size:20px;line-height:1.6">
-          Bienvenido a tu asistente de retrospectivas. Un lugar donde vas a poder consultar las retros anteriores, ver resúmenes y facilitar nuevas sesiones en minutos de la forma más sencilla posible.
-        </p>
+    <section class="flow-hero">
+      <div class="flow-eyebrow">ASISTENTE DE RETROSPECTIVAS</div>
+      <h1 class="flow-title">Tu espacio para reflexionar,<br>aprender y mejorar en equipo.</h1>
+      <p class="flow-subtitle">Facilitá retrospectivas, transformá lo que pasó en aprendizajes y convertí las conversaciones en acciones concretas.</p>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:30px">
+        <button id="newRetroBtn" class="primary" style="padding:14px 22px">Crear nueva retro →</button>
       </div>
+    </section>
 
-      <div style="margin-top:52px">
-        <div class="eyebrow">¿Qué podés hacer?</div>
-        <div class="grid" style="margin-top:18px">
-          <div class="card"><h3>📊 Explorar el historial</h3><p>Revisá las retros de los distintos equipos y descubrí patrones de mejora.</p></div>
-          <div class="card"><h3>💡 Consultar resúmenes y acuerdos</h3><p>Accedé rápido a los puntos clave y compromisos tomados en sesiones anteriores.</p></div>
-          <div class="card"><h3>🚀 Crear una nueva retro</h3><p>No pierdas tiempo en Miro: desde acá lo resolvemos.</p></div>
+    <section class="flow-section">
+      <div style="display:flex;justify-content:space-between;align-items:end;gap:18px;margin-bottom:22px;flex-wrap:wrap">
+        <div>
+          <div class="flow-eyebrow">La experiencia</div>
+          <h2 class="flow-section-title">Todo lo que necesitás para una buena retro</h2>
         </div>
       </div>
+      <div class="flow-feature-grid">
+        <article class="flow-feature-card">
+          <div class="flow-feature-number">01</div>
+          <h3>Explorá el historial</h3>
+          <p class="lead">Revisá retrospectivas anteriores y encontrá patrones de mejora a lo largo del tiempo.</p>
+        </article>
+        <article class="flow-feature-card">
+          <div class="flow-feature-number">02</div>
+          <h3>Conversá con foco</h3>
+          <p class="lead">Agrupá temas, priorizá lo importante y llevá al equipo hacia las conversaciones que más valor generan.</p>
+        </article>
+        <article class="flow-feature-card">
+          <div class="flow-feature-number">03</div>
+          <h3>Transformá en acciones</h3>
+          <p class="lead">Cerrá cada sesión con acuerdos, responsables y próximos pasos claros.</p>
+        </article>
+      </div>
+    </section>
 
-      <div style="margin-top:58px" class="card">
+    <section class="flow-section">
+      <div class="flow-history">
         <div style="display:flex;justify-content:space-between;align-items:end;gap:16px;flex-wrap:wrap">
-          <div><div class="eyebrow">Historial</div><h2 style="margin:8px 0 0">Retrospectivas anteriores</h2></div>
-          <button id="newRetroBtn" class="primary" style="padding:12px 18px">+ Crear nueva retro</button>
+          <div>
+            <div class="flow-eyebrow">Historial</div>
+            <h2 class="flow-section-title" style="margin-top:7px">Retrospectivas anteriores</h2>
+          </div>
         </div>
         <div id="landingHistory" style="margin-top:24px">
           ${landingRetros.length ? landingRetros.map(landingRetroRow).join("") : `<p style="opacity:.65;margin:0">Todavía no hay retrospectivas cargadas.</p>`}
@@ -3234,8 +3265,9 @@ function landingRetroRow(retro) {
   const date = escapeHtml(formatLandingDate(retro.fecha));
   const status = retro.finalizada_en ? "Finalizada" : "En preparación";
   return `
-    <div style="display:flex;justify-content:space-between;align-items:center;gap:18px;padding:18px 0;border-bottom:1px solid rgba(255,255,255,.08);flex-wrap:wrap">
+    <div class="flow-history-row" style="display:flex;justify-content:space-between;align-items:center;gap:18px;padding:18px 0;border-bottom:1px solid rgba(255,255,255,.08);flex-wrap:wrap">
       <div style="min-width:260px;flex:1">
+        <div class="flow-history-code">${escapeHtml(retro.codigo || "RETRO")}</div>
         <div style="font-size:18px;font-weight:700">${teams} · ${date}</div>
         <div style="opacity:.65;margin-top:5px">${status}</div>
       </div>
@@ -5803,6 +5835,8 @@ document
 // =====================================================
 
 async function initialize() {
+
+  injectFlowTheme();
 
   const isAdminRoute = urlParams.get("admin") === "1";
 

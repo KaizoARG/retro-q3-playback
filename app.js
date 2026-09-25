@@ -24,18 +24,47 @@ console.log("Código de retro:", RETRO_CODE);
 // =====================================================
 
 const state = {
+
   step: 0,
+
   energy: null,
 
-  // Votos acumulados de todos los participantes
+  // -----------------------------------------------
+  // RETRO
+  // -----------------------------------------------
+
+  retroId: null,
+
+  // -----------------------------------------------
+  // PARTICIPANTE
+  // -----------------------------------------------
+
+  participantId: null,
+
+  participantSessionId: null,
+
+  participant: null,
+
+  usedVotes: 0,
+
+  // -----------------------------------------------
+  // VOTOS GLOBALES
+  // -----------------------------------------------
+
   votes: {},
 
-  // Votos realizados por ESTE navegador
-  myVotes: {},
+  // -----------------------------------------------
+  // TARJETAS
+  // -----------------------------------------------
 
   cards: [],
-  retroId: null,
+
+  // -----------------------------------------------
+  // ACCIONES
+  // -----------------------------------------------
+
   actions: []
+
 };
 
 
@@ -46,22 +75,27 @@ const state = {
 const MAX_VOTES_PER_PARTICIPANT = 3;
 
 const voteTopics = [
+
   {
     key: "dependencias",
     label: "Dependencias entre equipos"
   },
+
   {
     key: "calidad",
     label: "Calidad y UAT"
   },
+
   {
     key: "priorizacion",
     label: "Priorización y foco"
   },
+
   {
     key: "metricas",
     label: "Visibilidad de métricas"
   }
+
 ];
 
 
@@ -70,6 +104,7 @@ const voteTopics = [
 // =====================================================
 
 const steps = [
+
   "Inicio",
   "Check-in",
   "Cosecha",
@@ -78,11 +113,12 @@ const steps = [
   "Conversación",
   "Acciones",
   "Cierre"
+
 ];
 
 
 // =====================================================
-// UTILIDADES
+// ESCAPE HTML
 // =====================================================
 
 function escapeHtml(value) {
@@ -97,6 +133,7 @@ function escapeHtml(value) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
+
 }
 
 
@@ -121,28 +158,35 @@ function render() {
   const app =
     document.querySelector("#app");
 
-  if (!app) {
-    return;
-  }
 
   if (stepLabel) {
+
     stepLabel.textContent =
       `${state.step + 1} / ${steps.length}`;
+
   }
+
 
   if (progressBar) {
+
     progressBar.style.width =
       `${((state.step + 1) / steps.length) * 100}%`;
+
   }
 
+
   if (backBtn) {
+
     backBtn.style.visibility =
       state.step === 0
         ? "hidden"
         : "visible";
+
   }
 
+
   if (nextBtn) {
+
     nextBtn.textContent =
       state.step === steps.length - 1
         ? "Reiniciar ↻"
@@ -151,12 +195,20 @@ function render() {
               ? "Comenzar →"
               : "Continuar →"
           );
+
   }
 
-  app.innerHTML =
-    screens[state.step]();
+
+  if (app) {
+
+    app.innerHTML =
+      screens[state.step]();
+
+  }
+
 
   bind();
+
 }
 
 
@@ -166,295 +218,396 @@ function render() {
 
 const screens = [
 
+
   // ===================================================
   // 1. INICIO
   // ===================================================
 
-  () => `<section class="hero">
+  () => `
 
-    <div class="pill">RETRO · Q3 2026</div>
+    <section class="hero">
 
-    <h1>
-      Hagamos visible<br>
-      lo que aprendimos.
-    </h1>
-
-    <p class="lead">
-      Una retro guiada para transformar experiencias del trimestre
-      en aprendizajes, conversaciones y acciones concretas.
-    </p>
-
-    <div class="grid">
-
-      <div class="card">
-        <h3>01 · Cosechar</h3>
-        <p>
-          Traemos hechos, aprendizajes y fricciones.
-        </p>
+      <div class="pill">
+        RETRO · Q3 2026
       </div>
 
-      <div class="card">
-        <h3>02 · Conversar</h3>
-        <p>
-          Elegimos dónde poner energía como equipo.
-        </p>
+      <h1>
+        Hagamos visible<br>
+        lo que aprendimos.
+      </h1>
+
+      <p class="lead">
+        Una retro guiada para transformar experiencias del trimestre
+        en aprendizajes, conversaciones y acciones concretas.
+      </p>
+
+      <div class="grid">
+
+        <div class="card">
+
+          <h3>
+            01 · Cosechar
+          </h3>
+
+          <p>
+            Traemos hechos, aprendizajes y fricciones.
+          </p>
+
+        </div>
+
+
+        <div class="card">
+
+          <h3>
+            02 · Conversar
+          </h3>
+
+          <p>
+            Elegimos dónde poner energía como equipo.
+          </p>
+
+        </div>
+
+
+        <div class="card">
+
+          <h3>
+            03 · Accionar
+          </h3>
+
+          <p>
+            Convertimos la conversación en compromisos.
+          </p>
+
+        </div>
+
       </div>
 
-      <div class="card">
-        <h3>03 · Accionar</h3>
-        <p>
-          Convertimos la conversación en compromisos.
-        </p>
-      </div>
+    </section>
 
-    </div>
-
-  </section>`,
+  `,
 
 
   // ===================================================
   // 2. CHECK-IN
   // ===================================================
 
-  () => `<section>
+  () => `
 
-    <div class="eyebrow">
-      Check-in
-    </div>
+    <section>
 
-    <h2>
-      ¿Con qué energía llegás?
-    </h2>
+      <div class="eyebrow">
+        Check-in
+      </div>
 
-    <p class="lead">
-      No buscamos una respuesta correcta.
-      Queremos tener una lectura rápida del estado del equipo.
-    </p>
+      <h2>
+        ¿Con qué energía llegás?
+      </h2>
 
-    <div class="choice-row">
+      <p class="lead">
+        No buscamos una respuesta correcta.
+        Queremos tener una lectura rápida del estado del equipo.
+      </p>
 
-      ${["😣", "😕", "😐", "🙂", "🚀"]
-        .map((x, i) =>
-          `<button
-            class="choice ${state.energy === i ? "selected" : ""}"
-            data-energy="${i}">
-            ${x}
-          </button>`
-        )
-        .join("")}
+      <div class="choice-row">
 
-    </div>
+        ${
 
-  </section>`,
+          ["😣", "😕", "😐", "🙂", "🚀"]
+
+            .map((x, i) => `
+
+              <button
+                class="choice ${
+                  state.energy === i
+                    ? "selected"
+                    : ""
+                }"
+                data-energy="${i}">
+
+                ${x}
+
+              </button>
+
+            `)
+
+            .join("")
+
+        }
+
+      </div>
+
+    </section>
+
+  `,
 
 
   // ===================================================
   // 3. COSECHA
   // ===================================================
 
-  () => `<section>
+  () => `
 
-    <div class="eyebrow">
-      Cosecha
-    </div>
+    <section>
 
-    <h2>
-      ¿Qué pasó durante este período?
-    </h2>
+      <div class="eyebrow">
+        Cosecha
+      </div>
 
-    <p class="lead">
-      Compartí algo que funcionó, algo que nos trabó
-      o algo que aprendimos.
-    </p>
+      <h2>
+        ¿Qué pasó durante este período?
+      </h2>
 
-    <div class="card" style="margin-top:30px">
+      <p class="lead">
+        Compartí algo que funcionó, algo que nos trabó
+        o algo que aprendimos.
+      </p>
 
-      <div class="action-form">
 
-        <select id="cardType">
+      <div
+        class="card"
+        style="margin-top:30px">
 
-          <option value="green">
+        <div class="action-form">
+
+          <select id="cardType">
+
+            <option value="green">
+              Funcionó
+            </option>
+
+            <option value="red">
+              Nos trabó
+            </option>
+
+            <option value="blue">
+              Aprendimos
+            </option>
+
+          </select>
+
+
+          <textarea
+            id="cardText"
+            placeholder="Escribí tu tarjeta..."></textarea>
+
+        </div>
+
+
+        <button
+          class="primary"
+          id="addCard"
+          style="margin-top:12px">
+
+          Agregar tarjeta +
+
+        </button>
+
+      </div>
+
+
+      <div
+        class="columns"
+        style="margin-top:30px">
+
+
+        <!-- FUNCIONÓ -->
+
+        <div class="column">
+
+          <div class="column-title">
+
             Funcionó
-          </option>
 
-          <option value="red">
-            Nos trabó
-          </option>
+            <small>
+              · ${
+                state.cards.filter(
+                  c => c.etapa === "green"
+                ).length
+              }
+            </small>
 
-          <option value="blue">
-            Aprendimos
-          </option>
-
-        </select>
-
-        <textarea
-          id="cardText"
-          placeholder="Escribí tu tarjeta...">
-        </textarea>
-
-      </div>
-
-      <button
-        class="primary"
-        id="addCard"
-        style="margin-top:12px">
-
-        Agregar tarjeta +
-
-      </button>
-
-    </div>
+          </div>
 
 
-    <div
-      class="columns"
-      style="margin-top:30px">
+          ${
+            state.cards
 
-      <!-- FUNCIONÓ -->
-
-      <div class="column">
-
-        <div class="column-title">
-
-          Funcionó
-
-          <small>
-            · ${
-              state.cards.filter(
+              .filter(
                 c => c.etapa === "green"
-              ).length
-            }
-          </small>
+              )
+
+              .map(c => `
+
+                <div class="sticky">
+
+                  ${escapeHtml(c.contenido)}
+
+                </div>
+
+              `)
+
+              .join("")
+
+          }
 
         </div>
 
-        ${
-          state.cards
-            .filter(c => c.etapa === "green")
-            .map(c => `
-              <div class="sticky">
-                ${escapeHtml(c.contenido)}
-              </div>
-            `)
-            .join("")
-        }
 
-      </div>
+        <!-- NOS TRABÓ -->
+
+        <div class="column">
+
+          <div class="column-title">
+
+            Nos trabó
+
+            <small>
+              · ${
+                state.cards.filter(
+                  c => c.etapa === "red"
+                ).length
+              }
+            </small>
+
+          </div>
 
 
-      <!-- NOS TRABÓ -->
+          ${
+            state.cards
 
-      <div class="column">
-
-        <div class="column-title">
-
-          Nos trabó
-
-          <small>
-            · ${
-              state.cards.filter(
+              .filter(
                 c => c.etapa === "red"
-              ).length
-            }
-          </small>
+              )
+
+              .map(c => `
+
+                <div class="sticky">
+
+                  ${escapeHtml(c.contenido)}
+
+                </div>
+
+              `)
+
+              .join("")
+
+          }
 
         </div>
 
-        ${
-          state.cards
-            .filter(c => c.etapa === "red")
-            .map(c => `
-              <div class="sticky">
-                ${escapeHtml(c.contenido)}
-              </div>
-            `)
-            .join("")
-        }
 
-      </div>
+        <!-- APRENDIMOS -->
+
+        <div class="column">
+
+          <div class="column-title">
+
+            Aprendimos
+
+            <small>
+              · ${
+                state.cards.filter(
+                  c => c.etapa === "blue"
+                ).length
+              }
+            </small>
+
+          </div>
 
 
-      <!-- APRENDIMOS -->
+          ${
+            state.cards
 
-      <div class="column">
-
-        <div class="column-title">
-
-          Aprendimos
-
-          <small>
-            · ${
-              state.cards.filter(
+              .filter(
                 c => c.etapa === "blue"
-              ).length
-            }
-          </small>
+              )
+
+              .map(c => `
+
+                <div class="sticky">
+
+                  ${escapeHtml(c.contenido)}
+
+                </div>
+
+              `)
+
+              .join("")
+
+          }
 
         </div>
 
-        ${
-          state.cards
-            .filter(c => c.etapa === "blue")
-            .map(c => `
-              <div class="sticky">
-                ${escapeHtml(c.contenido)}
-              </div>
-            `)
-            .join("")
-        }
-
       </div>
 
-    </div>
+    </section>
 
-  </section>`,
+  `,
 
 
   // ===================================================
   // 4. AGRUPACIÓN
   // ===================================================
 
-  () => `<section>
+  () => `
 
-    <div class="eyebrow">
-      Agrupación
-    </div>
+    <section>
 
-    <h2>
-      ¿Qué temas aparecen varias veces?
-    </h2>
+      <div class="eyebrow">
+        Agrupación
+      </div>
 
-    <p class="lead">
-      En una sesión real, el facilitador puede agrupar
-      tarjetas similares. Acá mostramos cómo quedaría
-      el resultado.
-    </p>
+      <h2>
+        ¿Qué temas aparecen varias veces?
+      </h2>
 
-    <div class="topic-list">
+      <p class="lead">
+        En una sesión real, el facilitador puede agrupar
+        tarjetas similares. Acá mostramos cómo quedaría
+        el resultado.
+      </p>
 
-      ${[
-        "Dependencias entre equipos",
-        "Calidad y UAT",
-        "Priorización y foco",
-        "Visibilidad de métricas"
-      ]
-      .map((x, i) =>
-        `<div class="topic">
 
-          <strong>
-            ${escapeHtml(x)}
-          </strong>
+      <div class="topic-list">
 
-          <span class="badge">
-            ${[6, 5, 4, 3][i]} tarjetas
-          </span>
+        ${
 
-        </div>`
-      ).join("")}
+          voteTopics
 
-    </div>
+            .map((topic, i) => `
 
-  </section>`,
+              <div class="topic">
+
+                <strong>
+                  ${topic.label}
+                </strong>
+
+                <span class="badge">
+
+                  ${[6, 5, 4, 3][i]}
+
+                  tarjeta${
+                    [6, 5, 4, 3][i] === 1
+                      ? ""
+                      : "s"
+                  }
+
+                </span>
+
+              </div>
+
+            `)
+
+            .join("")
+
+        }
+
+      </div>
+
+    </section>
+
+  `,
 
 
   // ===================================================
@@ -463,109 +616,131 @@ const screens = [
 
   () => {
 
-    const usedVotes =
-      Object.values(state.myVotes)
-        .reduce(
-          (sum, value) =>
-            sum + value,
-          0
-        );
-
     const remainingVotes =
       Math.max(
         0,
-        MAX_VOTES_PER_PARTICIPANT - usedVotes
+        MAX_VOTES_PER_PARTICIPANT -
+        state.usedVotes
       );
 
-    return `<section>
 
-      <div class="eyebrow">
-        Votación
-      </div>
+    return `
 
-      <h2>
-        ¿Dónde deberíamos poner energía?
-      </h2>
+      <section>
 
-      <p class="lead">
-        Tenés 3 votos. Elegí los temas que consideres
-        más importantes para conversar.
-      </p>
+        <div class="eyebrow">
+          Votación
+        </div>
 
-      <div
-        class="badge"
-        style="margin:20px 0">
+        <h2>
+          ¿Dónde deberíamos poner energía?
+        </h2>
 
-        Te quedan
+        <p class="lead">
+          Tenés 3 votos. Elegí los temas que consideres
+          más importantes para conversar.
+        </p>
 
-        <strong>
-          ${remainingVotes}
-        </strong>
 
-        voto${remainingVotes === 1 ? "" : "s"}
+        <div
+          class="badge"
+          style="margin:20px 0">
 
-      </div>
+          Participante
 
-      <div class="topic-list">
+          ${
+            state.participant
+              ? ` · ${escapeHtml(
+                  state.participant
+                )}`
+              : ""
+          }
 
-        ${voteTopics
-          .map(topic => {
+          · Te quedan
 
-            const totalVotes =
-              state.votes[topic.key] || 0;
+          <strong>
+            ${remainingVotes}
+          </strong>
 
-            const myVotes =
-              state.myVotes[topic.key] || 0;
+          voto${remainingVotes === 1 ? "" : "s"}
 
-            const disabled =
-              remainingVotes === 0;
+        </div>
 
-            return `
-              <div class="topic">
 
-                <div>
+        <div class="topic-list">
 
-                  <strong>
-                    ${escapeHtml(topic.label)}
-                  </strong>
+          ${
 
-                  <div class="badge">
+            voteTopics
 
-                    ${totalVotes}
+              .map(topic => {
 
-                    voto${totalVotes === 1 ? "" : "s"}
+                const totalVotes =
+                  state.votes[topic.key] || 0;
 
-                    ${
-                      myVotes > 0
-                        ? ` · vos: ${myVotes}`
-                        : ""
-                    }
+
+                const disabled =
+                  remainingVotes === 0;
+
+
+                return `
+
+                  <div class="topic">
+
+                    <div>
+
+                      <strong>
+                        ${topic.label}
+                      </strong>
+
+                      <div class="badge">
+
+                        ${totalVotes}
+
+                        voto${
+                          totalVotes === 1
+                            ? ""
+                            : "s"
+                        }
+
+                      </div>
+
+                    </div>
+
+
+                    <button
+                      class="primary vote"
+                      data-topic="${topic.key}"
+                      ${
+                        disabled
+                          ? "disabled"
+                          : ""
+                      }>
+
+                      ${
+                        disabled
+                          ? "Sin votos"
+                          : "Votar +1"
+                      }
+
+                    </button>
 
                   </div>
 
-                </div>
+                `;
 
-                <button
-                  class="primary vote"
-                  data-topic="${escapeHtml(topic.key)}"
-                  ${disabled ? "disabled" : ""}>
+              })
 
-                  ${
-                    disabled
-                      ? "Sin votos"
-                      : "Votar +1"
-                  }
+              .join("")
 
-                </button>
+          }
 
-              </div>
-            `;
-          })
-          .join("")}
+        </div>
 
-      </div>
+      </section>
 
-    </section>`;
+    `;
+
   },
 
 
@@ -577,73 +752,90 @@ const screens = [
 
     const topTopic =
       voteTopics
+
         .slice()
+
         .sort(
           (a, b) =>
             (state.votes[b.key] || 0) -
             (state.votes[a.key] || 0)
         )[0];
 
+
     const topTopicVotes =
       topTopic
         ? state.votes[topTopic.key] || 0
         : 0;
 
-    return `<section>
 
-      <div class="eyebrow">
-        Conversación
-      </div>
+    return `
 
-      <h2>
-        ${
-          topTopic
-            ? escapeHtml(topTopic.label)
-            : "Tema principal"
-        }
-      </h2>
+      <section>
 
-      <p class="lead">
+        <div class="eyebrow">
+          Conversación
+        </div>
 
-        Este tema recibió
-        ${topTopicVotes}
-        voto${topTopicVotes === 1 ? "" : "s"}.
+        <h2>
 
-        La pregunta ahora no es solamente qué pasó,
-        sino qué hay detrás.
+          ${
+            topTopic
+              ? escapeHtml(topTopic.label)
+              : "Tema principal"
+          }
 
-      </p>
+        </h2>
 
-      <div
-        class="card"
-        style="margin-top:34px">
 
-        <h3>
-          Preguntas guía
-        </h3>
+        <p class="lead">
 
-        <p>
+          Este tema recibió
+          ${topTopicVotes}
+          voto${
+            topTopicVotes === 1
+              ? ""
+              : "s"
+          }.
 
-          ¿Dónde aparece la dependencia?
-
-          <br><br>
-
-          ¿Qué información llega tarde?
-
-          <br><br>
-
-          ¿Qué decisión podría tomarse antes?
-
-          <br><br>
-
-          ¿Qué necesitamos cambiar
-          en nuestro sistema de trabajo?
+          La pregunta ahora no es solamente qué pasó,
+          sino qué hay detrás.
 
         </p>
 
-      </div>
 
-    </section>`;
+        <div
+          class="card"
+          style="margin-top:34px">
+
+          <h3>
+            Preguntas guía
+          </h3>
+
+          <p>
+
+            ¿Dónde aparece la dependencia?
+
+            <br><br>
+
+            ¿Qué información llega tarde?
+
+            <br><br>
+
+            ¿Qué decisión podría tomarse antes?
+
+            <br><br>
+
+            ¿Qué necesitamos cambiar
+            en nuestro sistema de trabajo?
+
+          </p>
+
+        </div>
+
+      </section>
+
+    `;
+
   },
 
 
@@ -651,90 +843,97 @@ const screens = [
   // 7. ACCIONES
   // ===================================================
 
-  () => `<section>
+  () => `
 
-    <div class="eyebrow">
-      Acciones
-    </div>
+    <section>
 
-    <h2>
-      Convirtamos la conversación en algo concreto.
-    </h2>
+      <div class="eyebrow">
+        Acciones
+      </div>
 
-    <p class="lead">
-      Una acción útil tiene un responsable y una fecha.
-      Evitemos acciones genéricas.
-    </p>
+      <h2>
+        Convirtamos la conversación en algo concreto.
+      </h2>
 
-    <div class="action-form">
+      <p class="lead">
+        Una acción útil tiene un responsable y una fecha.
+        Evitemos acciones genéricas.
+      </p>
 
-      <input
-        id="actionText"
-        placeholder="¿Qué vamos a hacer?">
 
-      <input
-        id="actionOwner"
-        placeholder="Responsable">
+      <div class="action-form">
 
-      <input
-        id="actionDate"
-        type="date">
+        <input
+          id="actionText"
+          placeholder="¿Qué vamos a hacer?">
 
-      <textarea
-        id="actionWhy"
-        placeholder="¿Cómo sabremos que funcionó?">
-      </textarea>
 
-    </div>
+        <input
+          id="actionOwner"
+          placeholder="Responsable">
 
-    <button
-      class="primary"
-      id="addAction"
-      style="margin-top:12px">
 
-      Agregar acción +
+        <input
+          id="actionDate"
+          type="date">
 
-    </button>
 
-    <div class="actions">
+        <textarea
+          id="actionWhy"
+          placeholder="¿Cómo sabremos que funcionó?"></textarea>
 
-      ${
-        state.actions.length === 0
+      </div>
 
-          ? `
-            <div class="card" style="margin-top:20px">
-              <p>
-                Todavía no hay acciones registradas.
-              </p>
-            </div>
-          `
 
-          : state.actions
-              .map(a =>
-                `<div class="action">
+      <button
+        class="primary"
+        id="addAction"
+        style="margin-top:12px">
 
-                  <div>
+        Agregar acción +
 
-                    <strong>
-                      ${escapeHtml(a.text)}
-                    </strong>
+      </button>
 
-                    <div class="badge">
-                      ${escapeHtml(a.owner)}
-                      ·
-                      ${escapeHtml(a.date)}
-                    </div>
+
+      <div class="actions">
+
+        ${
+
+          state.actions
+
+            .map(a => `
+
+              <div class="action">
+
+                <div>
+
+                  <strong>
+                    ${escapeHtml(a.text)}
+                  </strong>
+
+                  <div class="badge">
+
+                    ${escapeHtml(a.owner)}
+                    ·
+                    ${escapeHtml(a.date)}
 
                   </div>
 
-                </div>`
-              )
-              .join("")
-      }
+                </div>
 
-    </div>
+              </div>
 
-  </section>`,
+            `)
+
+            .join("")
+
+        }
+
+      </div>
+
+    </section>
+
+  `,
 
 
   // ===================================================
@@ -750,108 +949,136 @@ const screens = [
           ]
         : null;
 
+
     const topTopic =
       voteTopics
+
         .slice()
+
         .sort(
           (a, b) =>
             (state.votes[b.key] || 0) -
             (state.votes[a.key] || 0)
         )[0];
 
-    return `<section class="center">
 
-      <div class="eyebrow">
-        Cierre
-      </div>
+    return `
 
-      <h2>
-        Nos llevamos esto.
-      </h2>
+      <section class="center">
 
-      <p
-        class="lead"
-        style="margin:auto">
+        <div class="eyebrow">
+          Cierre
+        </div>
 
-        La retro termina cuando la conversación
-        se transforma en una decisión visible.
 
-      </p>
+        <h2>
+          Nos llevamos esto.
+        </h2>
 
-      <div class="summary">
 
-        <div class="card">
+        <p
+          class="lead"
+          style="margin:auto">
 
-          <div class="badge">
-            TEMA PRINCIPAL
+          La retro termina cuando la conversación
+          se transforma en una decisión visible.
+
+        </p>
+
+
+        <div class="summary">
+
+
+          <div class="card">
+
+            <div class="badge">
+              TEMA PRINCIPAL
+            </div>
+
+
+            <h3>
+
+              ${
+                topTopic
+                  ? escapeHtml(
+                      topTopic.label
+                    )
+                  : "Todavía no hay votos"
+              }
+
+            </h3>
+
+
+            <p>
+
+              ${
+                topTopic
+                  ? `${
+                      state.votes[
+                        topTopic.key
+                      ] || 0
+                    } votos`
+                  : "Votá un tema para definirlo."
+              }
+
+            </p>
+
           </div>
 
-          <h3>
 
-            ${
-              topTopic
-                ? escapeHtml(topTopic.label)
-                : "Todavía no hay votos"
-            }
+          <div class="card">
 
-          </h3>
+            <div class="badge">
+              PRÓXIMA ACCIÓN
+            </div>
 
-          <p>
 
-            ${
-              topTopic
-                ? `${state.votes[topTopic.key] || 0} votos`
-                : "Votá un tema para definirlo."
-            }
+            <h3>
 
-          </p>
+              ${
+                lastAction
+                  ? escapeHtml(
+                      lastAction.text
+                    )
+                  : "Todavía no hay acciones"
+              }
+
+            </h3>
+
+
+            <p>
+
+              ${
+                lastAction
+                  ? `${escapeHtml(
+                      lastAction.owner
+                    )} · ${escapeHtml(
+                      lastAction.date
+                    )}`
+                  : "Agregá una acción para verla acá."
+              }
+
+            </p>
+
+          </div>
+
 
         </div>
 
 
-        <div class="card">
-
-          <div class="badge">
-            PRÓXIMA ACCIÓN
-          </div>
-
-          <h3>
-
-            ${
-              lastAction
-                ? escapeHtml(lastAction.text)
-                : "Todavía no hay acciones"
-            }
-
-          </h3>
-
-          <p>
-
-            ${
-              lastAction
-                ? `
-                  ${escapeHtml(lastAction.owner)}
-                  ·
-                  ${escapeHtml(lastAction.date)}
-                `
-                : "Agregá una acción para verla acá."
-            }
-
-          </p>
-
+        <div class="big-number">
+          ✓
         </div>
 
-      </div>
 
-      <div class="big-number">
-        ✓
-      </div>
+        <p class="badge">
+          Retro finalizada · Q3 2026
+        </p>
 
-      <p class="badge">
-        Retro finalizada · Q3 2026
-      </p>
+      </section>
 
-    </section>`;
+    `;
+
   }
 
 ];
@@ -865,10 +1092,20 @@ async function loadRetro() {
 
   const { data, error } =
     await supabaseClient
+
       .from("retros")
-      .select("id, codigo, nombre")
-      .eq("codigo", RETRO_CODE)
+
+      .select(
+        "id, codigo, nombre"
+      )
+
+      .eq(
+        "codigo",
+        RETRO_CODE
+      )
+
       .single();
+
 
   if (error) {
 
@@ -877,23 +1114,288 @@ async function loadRetro() {
       error
     );
 
+
     alert(
       "No se encontró la retro: " +
       RETRO_CODE
     );
 
+
     return false;
+
   }
+
 
   state.retroId =
     data.id;
+
 
   console.log(
     "Retro cargada:",
     data
   );
 
+
   return true;
+
+}
+
+
+// =====================================================
+// CREAR / RECUPERAR PARTICIPANTE
+// =====================================================
+
+async function loadParticipant() {
+
+  if (!state.retroId) {
+
+    console.error(
+      "No hay retroId para crear participante."
+    );
+
+    return false;
+
+  }
+
+
+  const storageKey =
+    `retro-session-${state.retroId}`;
+
+
+  let sessionId =
+    localStorage.getItem(
+      storageKey
+    );
+
+
+  // ---------------------------------------------------
+  // Crear session ID si no existe
+  // ---------------------------------------------------
+
+  if (!sessionId) {
+
+    sessionId =
+      crypto.randomUUID();
+
+    localStorage.setItem(
+      storageKey,
+      sessionId
+    );
+
+  }
+
+
+  state.participantSessionId =
+    sessionId;
+
+
+  console.log(
+    "Session ID:",
+    sessionId
+  );
+
+
+  // ---------------------------------------------------
+  // Buscar participante existente
+  // ---------------------------------------------------
+
+  let {
+    data: participant,
+    error: selectError
+  } = await supabaseClient
+
+    .from("participantes")
+
+    .select("*")
+
+    .eq(
+      "retro_id",
+      state.retroId
+    )
+
+    .eq(
+      "session_id",
+      sessionId
+    )
+
+    .maybeSingle();
+
+
+  if (selectError) {
+
+    console.error(
+      "Error buscando participante:",
+      selectError
+    );
+
+    return false;
+
+  }
+
+
+  // ---------------------------------------------------
+  // Crear participante si no existe
+  // ---------------------------------------------------
+
+  if (!participant) {
+
+    const {
+      data: created,
+      error: insertError
+    } = await supabaseClient
+
+      .from("participantes")
+
+      .insert({
+
+        retro_id:
+          state.retroId,
+
+        session_id:
+          sessionId,
+
+        nombre:
+          null
+
+      })
+
+      .select()
+
+      .single();
+
+
+    if (insertError) {
+
+      console.error(
+        "Error creando participante:",
+        insertError
+      );
+
+      alert(
+        "No se pudo crear el participante.\n\n" +
+        insertError.message
+      );
+
+      return false;
+
+    }
+
+
+    participant =
+      created;
+
+  }
+
+
+  // ---------------------------------------------------
+  // Guardar participante en state
+  // ---------------------------------------------------
+
+  state.participantId =
+    participant.id;
+
+
+  state.participant =
+    participant.nombre ||
+    `Participante`;
+
+
+  console.log(
+    "Participante:",
+    participant
+  );
+
+
+  // ---------------------------------------------------
+  // Cargar votos utilizados
+  // ---------------------------------------------------
+
+  await loadParticipantVotes();
+
+
+  // ---------------------------------------------------
+  // Actualizar last_seen
+  // ---------------------------------------------------
+
+  await supabaseClient
+
+    .from("participantes")
+
+    .update({
+      last_seen_at:
+        new Date().toISOString()
+    })
+
+    .eq(
+      "id",
+      state.participantId
+    );
+
+
+  return true;
+
+}
+
+
+// =====================================================
+// CARGAR VOTOS DEL PARTICIPANTE
+// =====================================================
+
+async function loadParticipantVotes() {
+
+  if (
+    !state.retroId ||
+    !state.participantId
+  ) {
+
+    return;
+
+  }
+
+
+  const {
+    data,
+    error
+  } = await supabaseClient
+
+    .from("voto_participantes")
+
+    .select(
+      "id, topic_key"
+    )
+
+    .eq(
+      "retro_id",
+      state.retroId
+    )
+
+    .eq(
+      "participante_id",
+      state.participantId
+    );
+
+
+  if (error) {
+
+    console.error(
+      "Error cargando votos del participante:",
+      error
+    );
+
+    return;
+
+  }
+
+
+  state.usedVotes =
+    (data || []).length;
+
+
+  console.log(
+    "Votos utilizados por participante:",
+    state.usedVotes
+  );
+
 }
 
 
@@ -903,14 +1405,27 @@ async function loadRetro() {
 
 async function loadCards() {
 
-  const { data, error } =
-    await supabaseClient
-      .from("cards")
-      .select("*")
-      .eq("retro_id", state.retroId)
-      .order("created_at", {
+  const {
+    data,
+    error
+  } = await supabaseClient
+
+    .from("cards")
+
+    .select("*")
+
+    .eq(
+      "retro_id",
+      state.retroId
+    )
+
+    .order(
+      "created_at",
+      {
         ascending: true
-      });
+      }
+    );
+
 
   if (error) {
 
@@ -920,15 +1435,19 @@ async function loadCards() {
     );
 
     return;
+
   }
+
 
   state.cards =
     data || [];
+
 
   console.log(
     "Tarjetas cargadas:",
     state.cards
   );
+
 }
 
 
@@ -938,14 +1457,27 @@ async function loadCards() {
 
 async function loadActions() {
 
-  const { data, error } =
-    await supabaseClient
-      .from("acciones")
-      .select("*")
-      .eq("retro_id", state.retroId)
-      .order("created_at", {
+  const {
+    data,
+    error
+  } = await supabaseClient
+
+    .from("acciones")
+
+    .select("*")
+
+    .eq(
+      "retro_id",
+      state.retroId
+    )
+
+    .order(
+      "created_at",
+      {
         ascending: true
-      });
+      }
+    );
+
 
   if (error) {
 
@@ -955,9 +1487,12 @@ async function loadActions() {
     );
 
     return;
+
   }
 
+
   state.actions =
+
     (data || []).map(
       action => ({
 
@@ -978,24 +1513,35 @@ async function loadActions() {
       })
     );
 
+
   console.log(
     "Acciones cargadas:",
     state.actions
   );
+
 }
 
 
 // =====================================================
-// CARGAR VOTOS
+// CARGAR VOTOS GLOBALES
 // =====================================================
 
 async function loadVotes() {
 
-  const { data, error } =
-    await supabaseClient
-      .from("votos")
-      .select("*")
-      .eq("retro_id", state.retroId);
+  const {
+    data,
+    error
+  } = await supabaseClient
+
+    .from("votos")
+
+    .select("*")
+
+    .eq(
+      "retro_id",
+      state.retroId
+    );
+
 
   if (error) {
 
@@ -1005,9 +1551,12 @@ async function loadVotes() {
     );
 
     return;
+
   }
 
+
   state.votes = {};
+
 
   (data || []).forEach(
     row => {
@@ -1020,74 +1569,12 @@ async function loadVotes() {
     }
   );
 
+
   console.log(
-    "Votos cargados:",
+    "Votos globales:",
     state.votes
   );
-}
 
-
-// =====================================================
-// CARGAR MIS VOTOS DESDE LOCALSTORAGE
-// =====================================================
-
-function loadMyVotes() {
-
-  if (!state.retroId) {
-    return;
-  }
-
-  const storageKey =
-    `retro-my-votes-${state.retroId}`;
-
-  try {
-
-    const saved =
-      localStorage.getItem(
-        storageKey
-      );
-
-    state.myVotes =
-      saved
-        ? JSON.parse(saved)
-        : {};
-
-  } catch (error) {
-
-    console.error(
-      "Error cargando votos locales:",
-      error
-    );
-
-    state.myVotes = {};
-  }
-
-  console.log(
-    "Mis votos:",
-    state.myVotes
-  );
-}
-
-
-// =====================================================
-// GUARDAR MIS VOTOS
-// =====================================================
-
-function saveMyVotes() {
-
-  if (!state.retroId) {
-    return;
-  }
-
-  const storageKey =
-    `retro-my-votes-${state.retroId}`;
-
-  localStorage.setItem(
-    storageKey,
-    JSON.stringify(
-      state.myVotes
-    )
-  );
 }
 
 
@@ -1105,25 +1592,34 @@ function subscribeToCards() {
     )
 
     .on(
+
       "postgres_changes",
+
       {
+
         event: "INSERT",
+
         schema: "public",
+
         table: "cards",
+
         filter:
           `retro_id=eq.${state.retroId}`
+
       },
 
-      (payload) => {
+      payload => {
 
         console.log(
           "Nueva tarjeta recibida:",
           payload.new
         );
 
+
         if (!payload.new) {
           return;
         }
+
 
         const exists =
           state.cards.some(
@@ -1132,22 +1628,30 @@ function subscribeToCards() {
               payload.new.id
           );
 
-        if (exists) {
-          return;
+
+        if (!exists) {
+
+          state.cards.push(
+            payload.new
+          );
+
+
+          if (
+            state.step === 2
+          ) {
+
+            render();
+
+          }
+
         }
 
-        state.cards.push(
-          payload.new
-        );
-
-        if (state.step === 2) {
-          render();
-        }
       }
+
     )
 
     .subscribe(
-      (status) => {
+      status => {
 
         console.log(
           "Realtime cards:",
@@ -1156,6 +1660,7 @@ function subscribeToCards() {
 
       }
     );
+
 }
 
 
@@ -1173,47 +1678,65 @@ function subscribeToVotes() {
     )
 
     .on(
+
       "postgres_changes",
+
       {
+
         event: "*",
+
         schema: "public",
+
         table: "votos",
+
         filter:
           `retro_id=eq.${state.retroId}`
+
       },
 
-      (payload) => {
+      payload => {
 
         console.log(
           "Cambio de votos recibido:",
           payload
         );
 
+
         const row =
           payload.new;
+
 
         if (!row) {
           return;
         }
+
 
         state.votes[
           row.topic_key
         ] =
           row.votos || 0;
 
+
         if (
+
           state.step === 4 ||
+
           state.step === 5 ||
+
           state.step === 7
+
         ) {
+
           render();
+
         }
 
       }
+
     )
 
     .subscribe(
-      (status) => {
+      status => {
 
         console.log(
           "Realtime votos:",
@@ -1222,6 +1745,7 @@ function subscribeToVotes() {
 
       }
     );
+
 }
 
 
@@ -1239,25 +1763,34 @@ function subscribeToActions() {
     )
 
     .on(
+
       "postgres_changes",
+
       {
+
         event: "INSERT",
+
         schema: "public",
+
         table: "acciones",
+
         filter:
           `retro_id=eq.${state.retroId}`
+
       },
 
-      (payload) => {
+      payload => {
 
         console.log(
           "Nueva acción recibida:",
           payload.new
         );
 
+
         if (!payload.new) {
           return;
         }
+
 
         const exists =
           state.actions.some(
@@ -1266,14 +1799,13 @@ function subscribeToActions() {
               payload.new.id
           );
 
-        // Evita duplicar la acción.
-        // Esto ocurre porque quien crea
-        // la acción también la agrega localmente.
+
         if (exists) {
           return;
         }
 
-        const newAction = {
+
+        state.actions.push({
 
           id:
             payload.new.id,
@@ -1289,26 +1821,27 @@ function subscribeToActions() {
             payload.new.fecha ||
             "Por definir"
 
-        };
+        });
 
-        state.actions.push(
-          newAction
-        );
 
-        // Solo necesitamos refrescar
-        // las pantallas que muestran acciones.
         if (
+
           state.step === 6 ||
+
           state.step === 7
+
         ) {
+
           render();
+
         }
 
       }
+
     )
 
     .subscribe(
-      (status) => {
+      status => {
 
         console.log(
           "Realtime acciones:",
@@ -1317,6 +1850,62 @@ function subscribeToActions() {
 
       }
     );
+
+}
+
+
+// =====================================================
+// REALTIME - PARTICIPANTES
+// =====================================================
+
+function subscribeToParticipants() {
+
+  supabaseClient
+
+    .channel(
+      "participants-realtime-" +
+      state.retroId
+    )
+
+    .on(
+
+      "postgres_changes",
+
+      {
+
+        event: "INSERT",
+
+        schema: "public",
+
+        table: "participantes",
+
+        filter:
+          `retro_id=eq.${state.retroId}`
+
+      },
+
+      payload => {
+
+        console.log(
+          "Nuevo participante:",
+          payload.new
+        );
+
+      }
+
+    )
+
+    .subscribe(
+      status => {
+
+        console.log(
+          "Realtime participantes:",
+          status
+        );
+
+      }
+    );
+
 }
 
 
@@ -1324,7 +1913,7 @@ function subscribeToActions() {
 // EVENTOS
 // =====================================================
 
-function bind() {
+async function bind() {
 
 
   // ===================================================
@@ -1332,9 +1921,11 @@ function bind() {
   // ===================================================
 
   document
+
     .querySelectorAll(
       "[data-energy]"
     )
+
     .forEach(
       button => {
 
@@ -1358,7 +1949,11 @@ function bind() {
   // ===================================================
 
   document
-    .querySelectorAll(".vote")
+
+    .querySelectorAll(
+      ".vote"
+    )
+
     .forEach(
       button => {
 
@@ -1368,18 +1963,26 @@ function bind() {
             const topicKey =
               button.dataset.topic;
 
-            const usedVotes =
-              Object.values(
-                state.myVotes
-              )
-              .reduce(
-                (sum, value) =>
-                  sum + value,
-                0
-              );
+
+            // -----------------------------------------
+            // Validaciones locales
+            // -----------------------------------------
 
             if (
-              usedVotes >=
+              !state.participantId
+            ) {
+
+              alert(
+                "No se encontró tu participante."
+              );
+
+              return;
+
+            }
+
+
+            if (
+              state.usedVotes >=
               MAX_VOTES_PER_PARTICIPANT
             ) {
 
@@ -1388,31 +1991,43 @@ function bind() {
               );
 
               return;
+
             }
 
 
             // -----------------------------------------
-            // Incrementar voto en Supabase
+            // Evitar doble click
             // -----------------------------------------
 
             button.disabled =
               true;
 
+
+            // -----------------------------------------
+            // Registrar voto en servidor
+            // -----------------------------------------
+
             const {
               data,
               error
-            } =
-              await supabaseClient
-                .rpc(
-                  "increment_vote",
-                  {
-                    p_retro_id:
-                      state.retroId,
+            } = await supabaseClient
 
-                    p_topic_key:
-                      topicKey
-                  }
-                );
+              .rpc(
+                "cast_vote",
+                {
+
+                  p_retro_id:
+                    state.retroId,
+
+                  p_participante_id:
+                    state.participantId,
+
+                  p_topic_key:
+                    topicKey
+
+                }
+              );
+
 
             if (error) {
 
@@ -1421,51 +2036,50 @@ function bind() {
                 error
               );
 
+
               alert(
                 "No se pudo registrar el voto.\n\n" +
                 error.message
               );
 
+
               render();
 
               return;
+
             }
 
 
             console.log(
-              "Voto guardado:",
+              "Voto registrado:",
               data
             );
 
 
             // -----------------------------------------
-            // Actualizar votos locales
+            // Actualizar contador local
             // -----------------------------------------
 
-            state.myVotes[
-              topicKey
-            ] =
-              (
-                state.myVotes[
-                  topicKey
-                ] || 0
-              ) + 1;
-
-            saveMyVotes();
+            state.usedVotes++;
 
 
             // -----------------------------------------
-            // Actualizar contador global
+            // Actualizar inmediatamente el agregado
             // -----------------------------------------
 
-            if (data) {
+            if (
+              state.votes[topicKey] ===
+              undefined
+            ) {
 
-              state.votes[
-                data.topic_key
-              ] =
-                data.votos;
+              state.votes[topicKey] =
+                0;
 
             }
+
+
+            state.votes[topicKey]++;
+
 
             render();
 
@@ -1484,30 +2098,35 @@ function bind() {
       "#addCard"
     );
 
+
   if (addCard) {
 
     addCard.onclick =
       async () => {
 
-        const textInput =
+        const textarea =
           document.querySelector(
             "#cardText"
           );
 
-        const typeInput =
+
+        const select =
           document.querySelector(
             "#cardType"
           );
 
-        if (!textInput || !typeInput) {
-          return;
-        }
 
         const text =
-          textInput.value.trim();
+          textarea
+            ? textarea.value.trim()
+            : "";
+
 
         const type =
-          typeInput.value;
+          select
+            ? select.value
+            : "green";
+
 
         if (!text) {
 
@@ -1515,37 +2134,38 @@ function bind() {
             "Escribí algo antes de agregar la tarjeta."
           );
 
-          textInput.focus();
-
           return;
+
         }
 
 
         addCard.disabled =
           true;
 
-        addCard.textContent =
-          "Guardando...";
-
 
         const {
           data,
           error
-        } =
-          await supabaseClient
-            .from("cards")
-            .insert({
-              contenido:
-                text,
+        } = await supabaseClient
 
-              etapa:
-                type,
+          .from("cards")
 
-              retro_id:
-                state.retroId
-            })
-            .select()
-            .single();
+          .insert({
+
+            contenido:
+              text,
+
+            etapa:
+              type,
+
+            retro_id:
+              state.retroId
+
+          })
+
+          .select()
+
+          .single();
 
 
         if (error) {
@@ -1555,18 +2175,19 @@ function bind() {
             error
           );
 
+
           alert(
             "No se pudo guardar la tarjeta.\n\n" +
             error.message
           );
 
+
           addCard.disabled =
             false;
 
-          addCard.textContent =
-            "Agregar tarjeta +";
 
           return;
+
         }
 
 
@@ -1579,8 +2200,10 @@ function bind() {
         const exists =
           state.cards.some(
             card =>
-              card.id === data.id
+              card.id ===
+              data.id
           );
+
 
         if (!exists) {
 
@@ -1589,6 +2212,7 @@ function bind() {
           );
 
         }
+
 
         render();
 
@@ -1606,6 +2230,7 @@ function bind() {
       "#addAction"
     );
 
+
   if (addAction) {
 
     addAction.onclick =
@@ -1616,27 +2241,24 @@ function bind() {
             "#actionText"
           );
 
+
         const ownerInput =
           document.querySelector(
             "#actionOwner"
           );
+
 
         const dateInput =
           document.querySelector(
             "#actionDate"
           );
 
-        if (
-          !textInput ||
-          !ownerInput ||
-          !dateInput
-        ) {
-          return;
-        }
-
 
         const text =
-          textInput.value.trim();
+          textInput
+            ? textInput.value.trim()
+            : "";
+
 
         if (!text) {
 
@@ -1644,80 +2266,118 @@ function bind() {
             "Escribí una acción."
           );
 
-          textInput.focus();
-
           return;
+
         }
 
 
         const owner =
-          ownerInput.value.trim()
-          || "Por definir";
+          ownerInput
+            ? ownerInput.value.trim()
+            : ""
+            || "Por definir";
 
 
         const date =
-          dateInput.value
-          || null;
+          dateInput
+            ? dateInput.value
+            : null;
 
-
-        // ---------------------------------------------
-        // Guardar acción en Supabase
-        // ---------------------------------------------
 
         addAction.disabled =
           true;
-
-        addAction.textContent =
-          "Guardando...";
 
 
         const {
           data,
           error
-        } =
-          await supabaseClient
-            .from("acciones")
-            .insert({
+        } = await supabaseClient
 
-              descripcion:
-                text,
+          .from("acciones")
 
-              responsable:
-                owner,
+          .insert({
 
-              fecha:
-                date,
+            descripcion:
+              text,
 
-              retro_id:
-                state.retroId
+            responsable:
+              owner,
 
-            })
-            .select()
-            .single();
+            fecha:
+              date || null,
+
+            retro_id:
+              state.retroId
+
+          })
+
+          .select()
+
+          .single();
 
 
         if (error) {
 
           console.error(
-            "ERROR SUPABASE",
-            error
+            "ERROR SUPABASE"
           );
 
-          alert(
-            "No se pudo guardar la acción.\n\n" +
-            "Code: " +
-            (error?.code || "N/A") +
-            "\n\nMessage: " +
-            (error?.message || "N/A")
+
+          console.error(
+            "code:",
+            error?.code
           );
+
+
+          console.error(
+            "message:",
+            error?.message
+          );
+
+
+          console.error(
+            "details:",
+            error?.details
+          );
+
+
+          console.error(
+            "hint:",
+            error?.hint
+          );
+
+
+          alert(
+
+            "ERROR SUPABASE\n\n" +
+
+            "Code: " +
+            (
+              error?.code ||
+              "N/A"
+            ) +
+
+            "\nMessage: " +
+            (
+              error?.message ||
+              "N/A"
+            ) +
+
+            "\nDetails: " +
+            (
+              error?.details ||
+              "N/A"
+            )
+
+          );
+
 
           addAction.disabled =
             false;
 
-          addAction.textContent =
-            "Agregar acción +";
 
           return;
+
         }
 
 
@@ -1726,10 +2386,6 @@ function bind() {
           data
         );
 
-
-        // ---------------------------------------------
-        // Agregar al estado local
-        // ---------------------------------------------
 
         const newAction = {
 
@@ -1750,9 +2406,21 @@ function bind() {
         };
 
 
-        state.actions.push(
-          newAction
-        );
+        const exists =
+          state.actions.some(
+            action =>
+              action.id ===
+              newAction.id
+          );
+
+
+        if (!exists) {
+
+          state.actions.push(
+            newAction
+          );
+
+        }
 
 
         render();
@@ -1773,13 +2441,14 @@ const nextBtn =
     "#nextBtn"
   );
 
+
 if (nextBtn) {
 
   nextBtn.onclick =
     async () => {
 
       // -----------------------------------------------
-      // Si estamos en Cierre → reiniciar navegación
+      // Reiniciar
       // -----------------------------------------------
 
       if (
@@ -1789,11 +2458,7 @@ if (nextBtn) {
 
         state.step = 0;
 
-        state.energy =
-          null;
-
-        // No borramos votos ni acciones
-        // porque están persistidos en Supabase.
+        state.energy = null;
 
         await loadVotes();
 
@@ -1802,8 +2467,13 @@ if (nextBtn) {
         render();
 
         return;
+
       }
 
+
+      // -----------------------------------------------
+      // Siguiente
+      // -----------------------------------------------
 
       state.step++;
 
@@ -1822,6 +2492,7 @@ const backBtn =
   document.querySelector(
     "#backBtn"
   );
+
 
 if (backBtn) {
 
@@ -1854,34 +2525,64 @@ async function initialize() {
   );
 
 
-  // -----------------------------------------------
+  // ---------------------------------------------------
   // 1. Cargar retro
-  // -----------------------------------------------
+  // ---------------------------------------------------
 
   const retroLoaded =
     await loadRetro();
 
+
   if (!retroLoaded) {
+
     return;
+
   }
 
 
-  // -----------------------------------------------
-  // 2. Cargar información persistida
-  // -----------------------------------------------
+  // ---------------------------------------------------
+  // 2. Crear / recuperar participante
+  // ---------------------------------------------------
+
+  const participantLoaded =
+    await loadParticipant();
+
+
+  if (!participantLoaded) {
+
+    console.error(
+      "No se pudo inicializar participante."
+    );
+
+    return;
+
+  }
+
+
+  // ---------------------------------------------------
+  // 3. Cargar tarjetas
+  // ---------------------------------------------------
 
   await loadCards();
 
+
+  // ---------------------------------------------------
+  // 4. Cargar acciones
+  // ---------------------------------------------------
+
   await loadActions();
+
+
+  // ---------------------------------------------------
+  // 5. Cargar votos globales
+  // ---------------------------------------------------
 
   await loadVotes();
 
-  loadMyVotes();
 
-
-  // -----------------------------------------------
-  // 3. Activar realtime
-  // -----------------------------------------------
+  // ---------------------------------------------------
+  // 6. Realtime
+  // ---------------------------------------------------
 
   subscribeToCards();
 
@@ -1889,10 +2590,12 @@ async function initialize() {
 
   subscribeToActions();
 
+  subscribeToParticipants();
 
-  // -----------------------------------------------
-  // 4. Mostrar aplicación
-  // -----------------------------------------------
+
+  // ---------------------------------------------------
+  // 7. Render inicial
+  // ---------------------------------------------------
 
   render();
 

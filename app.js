@@ -14,7 +14,7 @@ const supabaseClient = supabase.createClient(
 const urlParams = new URLSearchParams(window.location.search);
 
 const RETRO_CODE =
-  urlParams.get("retro") || "DEMO";
+  urlParams.get("retro") || null;
 
 console.log("Código de retro:", RETRO_CODE);
 
@@ -3157,6 +3157,240 @@ const screens = [
 ];
 
 
+
+// =====================================================
+// LANDING / HISTORIAL
+// =====================================================
+
+let landingRetros = [];
+let landingView = "home";
+let landingSelectedRetro = null;
+
+function todayLocalISO() {
+  const d = new Date();
+  const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 10);
+}
+
+function formatLandingDate(value) {
+  if (!value) return "Fecha no definida";
+  const d = new Date(`${value}T12:00:00`);
+  return d.toLocaleDateString("es-AR", {
+    day: "2-digit", month: "2-digit", year: "numeric"
+  });
+}
+
+function landingShell(content) {
+  const app = document.querySelector("#app");
+  const stepLabel = document.querySelector("#stepLabel");
+  const progressBar = document.querySelector("#progressBar");
+  const backBtn = document.querySelector("#backBtn");
+  const nextBtn = document.querySelector("#nextBtn");
+
+  if (stepLabel) stepLabel.textContent = "";
+  if (progressBar) progressBar.style.width = "0%";
+  if (backBtn) { backBtn.style.display = "none"; backBtn.disabled = true; }
+  if (nextBtn) nextBtn.style.display = "none";
+  if (app) app.innerHTML = content;
+}
+
+function landingHome() {
+  return `
+    <section style="max-width:1120px;margin:0 auto;padding:56px 20px 80px">
+      <div style="max-width:780px">
+        <div class="pill">ASISTENTE DE RETROSPECTIVAS</div>
+        <h1 style="font-size:clamp(42px,6vw,72px);line-height:1.02;margin:22px 0 18px">
+          Tu espacio para reflexionar, aprender y mejorar en equipo
+        </h1>
+        <p class="lead" style="font-size:20px;line-height:1.6">
+          Bienvenido a tu asistente de retrospectivas. Un lugar donde vas a poder consultar las retros anteriores, ver resúmenes y facilitar nuevas sesiones en minutos de la forma más sencilla posible.
+        </p>
+      </div>
+
+      <div style="margin-top:52px">
+        <div class="eyebrow">¿Qué podés hacer?</div>
+        <div class="grid" style="margin-top:18px">
+          <div class="card"><h3>📊 Explorar el historial</h3><p>Revisá las retros de los distintos equipos y descubrí patrones de mejora.</p></div>
+          <div class="card"><h3>💡 Consultar resúmenes y acuerdos</h3><p>Accedé rápido a los puntos clave y compromisos tomados en sesiones anteriores.</p></div>
+          <div class="card"><h3>🚀 Crear una nueva retro</h3><p>No pierdas tiempo en Miro: desde acá lo resolvemos.</p></div>
+        </div>
+      </div>
+
+      <div style="margin-top:58px" class="card">
+        <div style="display:flex;justify-content:space-between;align-items:end;gap:16px;flex-wrap:wrap">
+          <div><div class="eyebrow">Historial</div><h2 style="margin:8px 0 0">Retrospectivas anteriores</h2></div>
+          <button id="newRetroBtn" class="primary" style="padding:12px 18px">+ Crear nueva retro</button>
+        </div>
+        <div id="landingHistory" style="margin-top:24px">
+          ${landingRetros.length ? landingRetros.map(landingRetroRow).join("") : `<p style="opacity:.65;margin:0">Todavía no hay retrospectivas cargadas.</p>`}
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+function landingRetroRow(retro) {
+  const teams = escapeHtml(retro.equipos || retro.nombre || "Equipos no definidos");
+  const status = retro.finalizada_en ? "Finalizada" : "En preparación";
+  return `
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:18px;padding:18px 0;border-bottom:1px solid rgba(255,255,255,.08);flex-wrap:wrap">
+      <div style="min-width:260px;flex:1">
+        <div style="font-size:18px;font-weight:700">${teams}</div>
+        <div style="opacity:.65;margin-top:5px">${formatLandingDate(retro.fecha)} · ${status} · Código ${escapeHtml(retro.codigo)}</div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="landing-summary-btn" data-retro-id="${retro.id}" style="padding:9px 13px">Ver resumen</button>
+        <button class="landing-feedback-btn" data-retro-id="${retro.id}" style="padding:9px 13px">Ver feedback</button>
+        <button class="landing-enter-btn primary" data-code="${escapeHtml(retro.codigo)}" style="padding:9px 13px">Acceder</button>
+      </div>
+    </div>
+  `;
+}
+
+function landingCreateForm() {
+  return `
+    <section style="max-width:760px;margin:0 auto;padding:56px 20px 80px">
+      <button id="landingBackBtn" style="padding:9px 13px;margin-bottom:30px">← Volver</button>
+      <div class="eyebrow">Nueva retrospectiva</div>
+      <h2 style="margin-top:10px">Prepará una nueva sesión</h2>
+      <p class="lead">Indicá quiénes van a participar y la fecha de la retrospectiva.</p>
+      <div class="card" style="margin-top:28px">
+        <label class="badge" for="retroTeams">EQUIPO(S) PARTICIPANTE(S) · OBLIGATORIO</label>
+        <input id="retroTeams" type="text" placeholder="Ej. Playback, Catálogo y Contenido" style="width:100%;margin-top:10px;padding:13px;border-radius:10px;background:#111;color:inherit;border:1px solid rgba(255,255,255,.18)" autocomplete="off">
+        <label class="badge" for="retroDate" style="display:block;margin-top:24px">FECHA · OBLIGATORIO</label>
+        <input id="retroDate" type="date" value="${todayLocalISO()}" style="width:100%;margin-top:10px;padding:13px;border-radius:10px;background:#111;color:inherit;border:1px solid rgba(255,255,255,.18)">
+        <button id="createRetroBtn" class="primary" style="margin-top:26px;width:100%;padding:14px">Crear retrospectiva →</button>
+      </div>
+    </section>
+  `;
+}
+
+function landingSummaryView(summary) {
+  const retro = summary?.retro || {};
+  const cards = summary?.cards || [];
+  const questions = summary?.questions || [];
+  const actions = summary?.actions || [];
+  const topics = summary?.topics || [];
+  const topTopic = topics.find(t => t.key === summary?.top_topic_key) || topics[0];
+
+  const cardsForTopic = topTopic ? cards.filter(c => c.topic_key === topTopic.key) : cards;
+  return `
+    <section style="max-width:980px;margin:0 auto;padding:48px 20px 80px">
+      <button id="landingBackBtn" style="padding:9px 13px">← Volver al historial</button>
+      <div class="eyebrow" style="margin-top:30px">Resumen de retrospectiva</div>
+      <h2 style="margin-top:10px">${escapeHtml(retro.equipos || retro.nombre || "Retrospectiva")}</h2>
+      <p class="lead">${formatLandingDate(retro.fecha)}${retro.finalizada_en ? ` · Finalizada ${new Date(retro.finalizada_en).toLocaleString("es-AR")}` : ""}</p>
+
+      <div class="card" style="margin-top:26px">
+        <div class="eyebrow">Tema principal</div>
+        <h3 style="margin-top:10px">${escapeHtml(topTopic?.label ? `"${topTopic.label}"` : "Sin tema principal definido")}</h3>
+        ${cardsForTopic.length ? `<div style="display:grid;gap:10px;margin-top:16px">${cardsForTopic.map(c=>`<div style="padding:12px 14px;border-radius:10px;background:rgba(255,255,255,.04)">${escapeHtml(c.contenido)}</div>`).join("")}</div>` : `<p style="opacity:.65">No hay tarjetas asociadas a este tema.</p>`}
+      </div>
+
+      <div class="grid" style="margin-top:20px">
+        <div class="card"><div class="eyebrow">Preguntas guía</div>${questions.length ? `<ul>${questions.map(q=>`<li style="margin:10px 0">${escapeHtml(q.pregunta || q.text || "")}</li>`).join("")}</ul>` : `<p style="opacity:.65">No se registraron preguntas guía.</p>`}</div>
+        <div class="card"><div class="eyebrow">Acciones acordadas</div>${actions.length ? `<ul>${actions.map(a=>`<li style="margin:10px 0"><strong>${escapeHtml(a.descripcion || a.text || "")}</strong><br><span style="opacity:.65">${escapeHtml(a.responsable || a.owner || "Por definir")} · ${escapeHtml(a.fecha || a.date || "Por definir")}</span></li>`).join("")}</ul>` : `<p style="opacity:.65">No se registraron acciones.</p>`}</div>
+      </div>
+
+      <div class="card" style="margin-top:20px"><div class="eyebrow">Actividad completa</div>${cards.length ? `<div style="display:grid;gap:10px;margin-top:14px">${cards.map(c=>`<div><span class="badge">${escapeHtml(c.etapa || "Actividad")}</span> ${escapeHtml(c.contenido)}</div>`).join("")}</div>` : `<p style="opacity:.65">No hay tarjetas registradas.</p>`}</div>
+    </section>
+  `;
+}
+
+function landingFeedbackView(data) {
+  const rows = data?.feedback || [];
+  const avg = data?.average_rating;
+  return `
+    <section style="max-width:980px;margin:0 auto;padding:48px 20px 80px">
+      <button id="landingBackBtn" style="padding:9px 13px">← Volver al historial</button>
+      <div class="eyebrow" style="margin-top:30px">Feedback de la retrospectiva</div>
+      <h2 style="margin-top:10px">${escapeHtml(data?.retro?.equipos || data?.retro?.nombre || "Retrospectiva")}</h2>
+      <div class="grid" style="margin-top:24px">
+        <div class="card"><div class="eyebrow">Respuestas</div><div class="big-number">${rows.length}</div></div>
+        <div class="card"><div class="eyebrow">Promedio</div><div class="big-number">${avg == null ? "—" : Number(avg).toFixed(1)}</div><p style="opacity:.65">sobre 10</p></div>
+      </div>
+      <div class="card" style="margin-top:20px">
+        <div class="eyebrow">Comentarios</div>
+        ${rows.length ? rows.map(r=>`<div style="padding:18px 0;border-bottom:1px solid rgba(255,255,255,.08)"><div style="font-weight:700">${r.rating}/10</div><p style="margin:8px 0">${escapeHtml(r.observaciones)}</p>${r.feedback_herramienta ? `<p style="margin:8px 0;opacity:.7"><strong>Herramienta:</strong> ${escapeHtml(r.feedback_herramienta)}</p>` : ""}</div>`).join("") : `<p style="opacity:.65">Todavía no hay feedback cargado para esta retrospectiva.</p>`}
+      </div>
+    </section>
+  `;
+}
+
+async function loadLandingRetros() {
+  const { data, error } = await supabaseClient.rpc("get_retro_history");
+  if (error) {
+    console.error("Error cargando historial:", error);
+    landingRetros = [];
+    return;
+  }
+  landingRetros = data || [];
+}
+
+async function renderLanding() {
+  if (landingView === "create") landingShell(landingCreateForm());
+  else if (landingView === "summary") landingShell(landingSummaryView(landingSelectedRetro));
+  else if (landingView === "feedback") landingShell(landingFeedbackView(landingSelectedRetro));
+  else landingShell(landingHome());
+
+  bindLanding();
+}
+
+function bindLanding() {
+  const back = document.querySelector("#landingBackBtn");
+  if (back) back.onclick = async () => { landingView = "home"; await loadLandingRetros(); renderLanding(); };
+
+  const newBtn = document.querySelector("#newRetroBtn");
+  if (newBtn) newBtn.onclick = () => { landingView = "create"; renderLanding(); };
+
+  document.querySelectorAll(".landing-enter-btn").forEach(btn => {
+    btn.onclick = () => { window.location.href = `?retro=${encodeURIComponent(btn.dataset.code)}`; };
+  });
+
+  document.querySelectorAll(".landing-summary-btn").forEach(btn => {
+    btn.onclick = async () => {
+      btn.disabled = true;
+      const { data, error } = await supabaseClient.rpc("get_retro_summary", { p_retro_id: btn.dataset.retroId });
+      btn.disabled = false;
+      if (error) return alert("No se pudo cargar el resumen.\n\n" + error.message);
+      landingSelectedRetro = data;
+      landingView = "summary";
+      renderLanding();
+    };
+  });
+
+  document.querySelectorAll(".landing-feedback-btn").forEach(btn => {
+    btn.onclick = async () => {
+      btn.disabled = true;
+      const { data, error } = await supabaseClient.rpc("get_retro_feedback_summary", { p_retro_id: btn.dataset.retroId });
+      btn.disabled = false;
+      if (error) return alert("No se pudo cargar el feedback.\n\n" + error.message);
+      landingSelectedRetro = data;
+      landingView = "feedback";
+      renderLanding();
+    };
+  });
+
+  const createBtn = document.querySelector("#createRetroBtn");
+  if (createBtn) createBtn.onclick = async () => {
+    const teams = document.querySelector("#retroTeams")?.value.trim();
+    const date = document.querySelector("#retroDate")?.value || todayLocalISO();
+    if (!teams) return alert("Ingresá el nombre del equipo o equipos participantes.");
+    createBtn.disabled = true; createBtn.textContent = "Creando…";
+    const { data, error } = await supabaseClient.rpc("create_retro", { p_equipos: teams, p_fecha: date });
+    if (error) {
+      createBtn.disabled = false; createBtn.textContent = "Crear retrospectiva →";
+      return alert("No se pudo crear la retrospectiva.\n\n" + error.message);
+    }
+    window.location.href = `?retro=${encodeURIComponent(data.codigo)}`;
+  };
+}
+
+async function initializeLanding() {
+  await loadLandingRetros();
+  await renderLanding();
+}
+
 // =====================================================
 // CARGAR RETRO
 // =====================================================
@@ -5407,6 +5641,11 @@ document
 // =====================================================
 
 async function initialize() {
+
+  if (!RETRO_CODE) {
+    await initializeLanding();
+    return;
+  }
 
   console.log(
     "Inicializando retro..."

@@ -50,7 +50,7 @@ const state = {
   // Tarjetas de la retro
   cards: [],
 
-  // Tópicos persistidos de la retro
+  // Temas en común persistidos de la retro
   topics: [],
 
   // Retro actual
@@ -150,8 +150,8 @@ function titleCaseTopic(label) {
 function getDynamicTopics() {
   const grouped = new Map();
 
-  // Los tópicos persistidos son la fuente principal porque permiten
-  // tener tópicos manuales aunque todavía no tengan tarjetas asignadas.
+  // Los temas en común persistidos son la fuente principal porque permiten
+  // tener temas en común manuales aunque todavía no tengan tarjetas asignadas.
   (state.topics || []).forEach(topic => {
     grouped.set(topic.topic_key, {
       key: topic.topic_key,
@@ -222,156 +222,176 @@ function buildDynamicTopics(cards) {
     return { candidates: [], assignments: new Map() };
   }
 
+  // La agrupación automática busca patrones en las palabras con mayor
+  // presencia temática. No usa categorías predefinidas y nunca propone
+  // más de 3 temas en común.
   const frequencies = new Map();
+  const positions = new Map();
+
   prepared.forEach(item => {
     item.tokens.forEach(token => {
       frequencies.set(token, (frequencies.get(token) || 0) + 1);
+      if (!positions.has(token)) positions.set(token, []);
     });
+
+    const tokens = Array.from(item.tokens);
+    tokens.forEach((token, index) => positions.get(token).push(index));
   });
 
-  // 1. Detectar temas a partir de palabras/raíces repetidas.
-  const candidateTokens = Array.from(frequencies.entries())
-    .filter(([, count]) => count >= 2)
-    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  // Peso temático simple: prioriza concurrencia entre textos y, en empate,
+  // palabras más específicas/largas. Los stop words ya fueron excluidos.
+  const scoredTokens = Array.from(frequencies.entries())
+    .map(([token, frequency]) => ({
+      token,
+      frequency,
+      score: frequency * (1 + Math.min(token.length, 12) / 12)
+    }))
+    .sort((a, b) =>
+      b.score - a.score ||
+      b.frequency - a.frequency ||
+      b.token.length - a.token.length ||
+      a.token.localeCompare(b.token)
+    );
 
-  const candidates = [];
-  const usedTokens = new Set();
+  // Elegimos hasta 3 palabras clave suficientemente concurrentes y
+  // procurando que cada una represente un grupo diferente de tarjetas.
+  const keywords = [];
+  const coveredCards = new Set();
 
-  candidateTokens.forEach(([token]) => {
-    if (candidates.length >= 8 || usedTokens.has(token)) return;
+  for (const candidate of scoredTokens) {
+    if (keywords.length >= 3) break;
+    if (candidate.frequency < 2) continue;
 
-    const matching = prepared.filter(item => item.tokens.has(token));
-    if (matching.length < 2) return;
+    const matching = prepared.filter(item => item.tokens.has(candidate.token));
+    if (matching.length < 2) continue;
 
-    const related = Array.from(
-      new Set(matching.flatMap(item => Array.from(item.tokens)))
-    )
-      .filter(other =>
-        other !== token &&
-        !usedTokens.has(other) &&
-        (frequencies.get(other) || 0) >= 2
-      )
-      .sort((a, b) =>
-        (frequencies.get(b) || 0) - (frequencies.get(a) || 0) ||
-        a.localeCompare(b)
-      );
+    // Evitar que las 3 claves sean prácticamente el mismo grupo.
+    const matchingIds = new Set(matching.map(item => item.card.id));
+    const overlapWithExisting = keywords.some(keyword => {
+      const existingIds = keyword.cardIds;
+      const intersection = existingIds.filter(id => matchingIds.has(id)).length;
+      const union = new Set([...existingIds, ...matchingIds]).size;
+      return union > 0 && intersection / union >= 0.8;
+    });
 
-    const second = related[0];
-    const label = second
-      ? `${titleCaseTopic(token)} · ${titleCaseTopic(second)}`
-      : titleCaseTopic(token);
+    if (overlapWithExisting) continue;
 
-    candidates.push({ label, cards: matching });
-    usedTokens.add(token);
-    if (second) usedTokens.add(second);
-  });
+    keywords.push({
+      token: candidate.token,
+      frequency: candidate.frequency,
+      cardIds: matching.map(item => item.card.id)
+    });
 
-  // 2. Si no hubo palabras repetidas, agrupar por similitud entre tarjetas.
-  //    El umbral es deliberadamente bajo para que la agrupación no quede vacía.
-  if (candidates.length === 0) {
-    const unused = new Set(prepared.map(item => item.card.id));
+    matching.forEach(item => coveredCards.add(item.card.id));
+  }
 
-    while (unused.size >= 2 && candidates.length < 8) {
-      const seedId = unused.values().next().value;
-      const seed = prepared.find(item => item.card.id === seedId);
-      if (!seed) break;
+  // Si no encontramos palabras repetidas, usamos similitud entre tarjetas
+  // para detectar hasta 3 grupos sin inventar categorías.
+  if (!keywords.length) {
+    const remaining = new Set(prepared.map(item => item.card.id));
 
-      const matches = prepared.filter(item => {
-        if (!unused.has(item.card.id) || item.card.id === seedId) return false;
+    while (remaining.size >= 2 && keywords.length < 3) {
+      let bestPair = null;
 
-        const intersection = Array.from(seed.tokens)
-          .filter(token => item.tokens.has(token)).length;
-        const union = new Set([...seed.tokens, ...item.tokens]).size;
-        const similarity = union ? intersection / union : 0;
+      for (const seedId of remaining) {
+        const seed = prepared.find(item => item.card.id === seedId);
+        if (!seed) continue;
 
-        return similarity >= 0.15;
-      });
+        for (const candidate of prepared) {
+          if (candidate.card.id === seedId || !remaining.has(candidate.card.id)) continue;
 
-      if (!matches.length) {
-        unused.delete(seedId);
-        continue;
+          const intersection = Array.from(seed.tokens)
+            .filter(token => candidate.tokens.has(token)).length;
+          const union = new Set([...seed.tokens, ...candidate.tokens]).size;
+          const similarity = union ? intersection / union : 0;
+
+          if (!bestPair || similarity > bestPair.similarity) {
+            bestPair = { seed, candidate, similarity };
+          }
+        }
       }
 
-      const topicCards = [seed, ...matches];
-      const topicFrequency = new Map();
-      topicCards.forEach(item => item.tokens.forEach(token => {
-        topicFrequency.set(token, (topicFrequency.get(token) || 0) + 1);
-      }));
+      if (!bestPair || bestPair.similarity <= 0) break;
 
-      const words = Array.from(topicFrequency.entries())
-        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-        .slice(0, 2)
-        .map(([token]) => titleCaseTopic(token));
+      const groupIds = [bestPair.seed.card.id, bestPair.candidate.card.id];
+      const groupItems = [bestPair.seed, bestPair.candidate];
+      const groupFrequency = new Map();
 
-      candidates.push({
-        label: words.join(" · ") || "Tema",
-        cards: topicCards
+      groupItems.forEach(item => {
+        item.tokens.forEach(token => {
+          groupFrequency.set(token, (groupFrequency.get(token) || 0) + 1);
+        });
       });
 
-      topicCards.forEach(item => unused.delete(item.card.id));
+      const keyword = Array.from(groupFrequency.entries())
+        .sort((a, b) => b[1] - a[1] || b[0].length - a[0].length || a[0].localeCompare(b[0]))[0]?.[0];
+
+      if (!keyword) break;
+
+      keywords.push({ token: keyword, frequency: 2, cardIds: groupIds });
+      groupIds.forEach(id => remaining.delete(id));
     }
   }
 
+  // Si todavía no hay ningún grupo, usamos la palabra más relevante de los
+  // textos como único tema en común, manteniendo el máximo de 3.
+  if (!keywords.length) {
+    const fallback = scoredTokens[0];
+    if (fallback) {
+      keywords.push({
+        token: fallback.token,
+        frequency: fallback.frequency,
+        cardIds: prepared
+          .filter(item => item.tokens.has(fallback.token))
+          .map(item => item.card.id)
+      });
+    }
+  }
+
+  const candidates = keywords.slice(0, 3).map(keyword => ({
+    key: topicKeyFromLabel(titleCaseTopic(keyword.token)),
+    label: titleCaseTopic(keyword.token)
+  }));
+
   const assignments = new Map();
 
-  candidates.forEach(candidate => {
-    const key = topicKeyFromLabel(candidate.label);
+  // Asignamos cada texto al tema cuya palabra clave comparte, priorizando
+  // la cantidad de palabras relevantes compartidas con el grupo.
+  prepared.forEach(item => {
+    let best = null;
 
-    candidate.cards.forEach(item => {
-      const existing = assignments.get(item.card.id);
-      if (!existing || candidate.cards.length > existing.count) {
-        assignments.set(item.card.id, {
-          key,
-          label: candidate.label,
-          count: candidate.cards.length
-        });
+    candidates.forEach((candidate, index) => {
+      const keyword = keywords[index];
+      const keywordMatches = item.tokens.has(keyword.token) ? 1 : 0;
+      const groupItems = prepared.filter(groupItem => keyword.cardIds.includes(groupItem.card.id));
+      const groupTokens = new Set(groupItems.flatMap(groupItem => Array.from(groupItem.tokens)));
+      const shared = Array.from(item.tokens).filter(token => groupTokens.has(token)).length;
+      const score = keywordMatches * 100 + shared;
+
+      if (!best || score > best.score) {
+        best = { candidate, score };
       }
     });
-  });
 
-  // 3. Garantizar que ninguna tarjeta quede invisible después de generar.
-  //    Si una tarjeta no comparte suficientes conceptos con otra, se crea
-  //    un tópico individual basado en sus palabras más relevantes.
-  prepared.forEach(item => {
-    if (assignments.has(item.card.id)) return;
-
-    const words = Array.from(item.tokens)
-      .sort((a, b) =>
-        (frequencies.get(b) || 0) - (frequencies.get(a) || 0) ||
-        a.localeCompare(b)
-      )
-      .slice(0, 2)
-      .map(titleCaseTopic);
-
-    const label = words.join(" · ") || "Tema sin definir";
-    assignments.set(item.card.id, {
-      key: topicKeyFromLabel(label),
-      label,
-      count: 1
-    });
-  });
-
-  const uniqueTopics = new Map();
-  assignments.forEach(assignment => {
-    if (!uniqueTopics.has(assignment.key)) {
-      uniqueTopics.set(assignment.key, {
-        key: assignment.key,
-        label: assignment.label
+    if (best) {
+      assignments.set(item.card.id, {
+        key: best.candidate.key,
+        label: best.candidate.label,
+        count: 1
       });
     }
   });
 
   return {
-    candidates: Array.from(uniqueTopics.values()),
+    candidates,
     assignments
   };
 }
 
-
 const steps = [
   "Inicio",
   "Check-in",
-  "Cosecha",
+  "Actividad",
   "Agrupación",
   "Votación",
   "Conversación",
@@ -1020,7 +1040,7 @@ async function resetRetro() {
 
   const confirmed = window.confirm(
     "¿Reiniciar la sala?\n\n" +
-    "Se van a borrar todas las tarjetas de cosecha, agrupaciones, votos, acciones y participantes.\n" +
+    "Se van a borrar todas las tarjetas de actividad, agrupaciones, votos, acciones y participantes.\n" +
     "Todos tendrán que volver a ingresar su nombre para participar.\n\n" +
     "Esta acción no se puede deshacer."
   );
@@ -1906,7 +1926,7 @@ const screens = [
       <div class="grid">
 
         <div class="card">
-          <h3>01 · Cosechar</h3>
+          <h3>01 · Actividad</h3>
           <p>
             Traemos hechos, aprendizajes y fricciones.
           </p>
@@ -1978,7 +1998,7 @@ const screens = [
     <section>
 
       <div class="eyebrow">
-        Cosecha
+        Actividad
       </div>
 
       <h2>
@@ -2139,11 +2159,11 @@ const screens = [
         </div>
 
         <h2>
-          ¿Qué temas aparecen en la cosecha?
+          ¿Qué temas en común aparecen en la actividad?
         </h2>
 
         <p class="lead">
-          Los tópicos se generan a partir de lo que escribió el equipo.
+          Los temas en común se generan a partir de lo que escribió el equipo.
           No hay categorías predefinidas.
         </p>
 
@@ -2153,20 +2173,20 @@ const screens = [
               <div class="card" style="margin-top:30px">
                 <h3>Generar agrupación automática</h3>
                 <p>
-                  El sistema analiza las tarjetas de la cosecha, detecta temas repetidos y propone tópicos dinámicos.
+                  El sistema analiza las tarjetas de la actividad, detecta patrones de palabras y propone hasta 3 temas en común.
                 </p>
                 <button
                   class="primary"
                   id="generateTopicsBtn"
                   style="margin-top:12px">
-                  ${dynamicTopics.length ? "Regenerar tópicos" : "Generar tópicos"}
+                  ${dynamicTopics.length ? "Regenerar temas en común" : "Generar temas en común"}
                 </button>
               </div>
             `
             : `
               <div class="card" style="margin-top:30px">
                 <p>
-                  El facilitador está generando los tópicos a partir de la cosecha.
+                  El facilitador está generando los temas en común a partir de la actividad.
                 </p>
               </div>
             `
@@ -2187,7 +2207,7 @@ const screens = [
                     border:1px solid rgba(255,255,255,.18);
                     color:inherit;
                   ">
-                  + Agregar tópico
+                  + Agregar tema en común
                 </button>
               </div>
             `
@@ -2226,8 +2246,8 @@ const screens = [
                                 color:inherit;
                               "
                               data-topic-key="${escapeHtml(topic.key)}"
-                              title="Renombrar tópico"
-                              aria-label="Renombrar tópico">
+                              title="Renombrar tema"
+                              aria-label="Renombrar tema">
                               ✏️
                             </button>
                             <button
@@ -2243,8 +2263,8 @@ const screens = [
                                 color:inherit;
                               "
                               data-topic-key="${escapeHtml(topic.key)}"
-                              title="Eliminar tópico"
-                              aria-label="Eliminar tópico">
+                              title="Eliminar tema"
+                              aria-label="Eliminar tema">
                               🗑️
                             </button>
                           </div>
@@ -2256,7 +2276,7 @@ const screens = [
               : `
                 <div class="card">
                   <p>
-                    Todavía no hay tópicos. Generá una agrupación automática o agregá uno manualmente.
+                    Todavía no hay temas en común. Generá una agrupación automática o agregá uno manualmente.
                   </p>
                 </div>
               `
@@ -2522,7 +2542,7 @@ const screens = [
                 style="margin-top:30px">
 
                 <h3>
-                  Lo que apareció en la cosecha
+                  Lo que apareció en la actividad
                 </h3>
 
                 <div
@@ -2882,14 +2902,14 @@ async function loadTopics() {
       .order("created_at", { ascending: true });
 
   if (error) {
-    console.error("Error cargando tópicos:", error);
+    console.error("Error cargando temas en común:", error);
     state.topics = [];
     return;
   }
 
   state.topics = data || [];
 
-  console.log("Tópicos cargados:", state.topics);
+  console.log("Temas en común cargados:", state.topics);
 }
 
 
@@ -3101,7 +3121,7 @@ function subscribeToCards() {
       payload => {
 
         if (suppressCardRealtime) {
-          console.log("Realtime cards ignorado durante generación de tópicos:", payload);
+          console.log("Realtime cards ignorado durante generación de temas en común:", payload);
           return;
         }
 
@@ -3213,7 +3233,7 @@ function subscribeToTopics() {
         filter: `retro_id=eq.${state.retroId}`
       },
       async payload => {
-        console.log("Cambio de tópicos recibido:", payload);
+        console.log("Cambio de temas en común recibido:", payload);
         await loadTopics();
 
         if (state.step >= 3 && state.step <= 7) {
@@ -3564,7 +3584,7 @@ async function bind() {
 
   if (generateTopicsBtn) {
     generateTopicsBtn.onclick = async () => {
-      console.log("Click en Generar tópicos", {
+      console.log("Click en Generar temas en común", {
         isFacilitator: state.isFacilitator,
         cards: state.cards.length,
         retroId: state.retroId,
@@ -3572,7 +3592,7 @@ async function bind() {
       });
 
       if (!state.isFacilitator) {
-        alert("Solo el facilitador puede generar los tópicos.");
+        alert("Solo el facilitador puede generar los temas en común.");
         return;
       }
 
@@ -3596,13 +3616,13 @@ async function bind() {
           topic_key: assignments.get(card.id)?.key || null
         }));
 
-        console.log("Iniciando generación de tópicos", {
+        console.log("Iniciando generación de temas en común", {
           cards: state.cards.length,
           updates,
           candidates: candidates.map(topic => topic.label)
         });
 
-        // Persistimos primero los tópicos propuestos para que existan
+        // Persistimos primero los temas en común propuestos para que existan
         // incluso si alguno todavía no tiene tarjetas asignadas.
         for (const topic of candidates) {
           const { data, error } = await supabaseClient.rpc(
@@ -3617,7 +3637,7 @@ async function bind() {
 
           if (error) throw error;
           if (!data?.success) {
-            throw new Error(data?.message || `No se pudo crear el tópico ${topic.label}.`);
+            throw new Error(data?.message || `No se pudo crear el tema en común ${topic.label}.`);
           }
         }
 
@@ -3694,17 +3714,17 @@ async function bind() {
 
         render();
 
-        console.log("Tópicos generados:", candidates.map(topic => topic.label));
+        console.log("Temas en común generados:", candidates.map(topic => topic.label));
         console.log(`Tarjetas actualizadas: ${results.length}/${updates.length}`);
         console.log("Cards verificadas:", verifiedCards);
 
         alert(
           `Agrupación generada correctamente\n\n` +
-          `${candidates.length} tópicos\n` +
+          `${candidates.length} temas en común\n` +
           `${results.length} tarjetas agrupadas`
         );
       } catch (error) {
-        console.error("Error generando tópicos:", error);
+        console.error("Error generando temas en común:", error);
 
         // Si falló la persistencia, recuperamos el estado real de Supabase.
         await loadCards();
@@ -3717,7 +3737,7 @@ async function bind() {
       } finally {
         suppressCardRealtime = false;
         generateTopicsBtn.disabled = false;
-        generateTopicsBtn.textContent = "Regenerar tópicos";
+        generateTopicsBtn.textContent = "Regenerar temas en común";
       }
     };
   }
@@ -3730,7 +3750,7 @@ async function bind() {
 
   if (addTopicBtn) {
     addTopicBtn.onclick = async () => {
-      const label = prompt("Nombre del nuevo tópico:");
+      const label = prompt("Nombre del nuevo tema en común:");
       const cleanLabel = String(label || "").trim();
 
       if (!cleanLabel) return;
@@ -3748,13 +3768,13 @@ async function bind() {
         );
 
         if (error) throw error;
-        if (!data?.success) throw new Error(data?.message || "No se pudo crear el tópico.");
+        if (!data?.success) throw new Error(data?.message || "No se pudo crear el tema en común.");
 
         await loadTopics();
         render();
       } catch (error) {
-        console.error("Error creando tópico:", error);
-        alert("No se pudo crear el tópico.\n\n" + error.message);
+        console.error("Error creando tema en común:", error);
+        alert("No se pudo crear el tema en común.\n\n" + error.message);
         addTopicBtn.disabled = false;
       }
     };
@@ -3772,7 +3792,7 @@ async function bind() {
         if (!topic) return;
 
         if (action === "rename") {
-          const newLabel = prompt("Nuevo nombre del tópico:", topic.label);
+          const newLabel = prompt("Nuevo nombre del tema en común:", topic.label);
           const cleanLabel = String(newLabel || "").trim();
 
           if (!cleanLabel || cleanLabel === topic.label) return;
@@ -3789,13 +3809,13 @@ async function bind() {
             );
 
             if (error) throw error;
-            if (!data?.success) throw new Error(data?.message || "No se pudo renombrar el tópico.");
+            if (!data?.success) throw new Error(data?.message || "No se pudo renombrar el tema en común.");
 
             await loadTopics();
             render();
           } catch (error) {
-            console.error("Error renombrando tópico:", error);
-            alert("No se pudo renombrar el tópico.\n\n" + error.message);
+            console.error("Error renombrando tema en común:", error);
+            alert("No se pudo renombrar el tema en común.\n\n" + error.message);
           }
 
           return;
@@ -3803,7 +3823,7 @@ async function bind() {
 
         if (action === "delete") {
           const confirmed = confirm(
-            `¿Eliminar el tópico "${topic.label}"?\n\nLas tarjetas asignadas quedarán como \"Sin agrupar\".`
+            `¿Eliminar el tema en común "${topic.label}"?\n\nLas tarjetas asignadas quedarán como \"Sin agrupar\".`
           );
 
           if (!confirmed) return;
@@ -3819,14 +3839,14 @@ async function bind() {
             );
 
             if (error) throw error;
-            if (!data?.success) throw new Error(data?.message || "No se pudo eliminar el tópico.");
+            if (!data?.success) throw new Error(data?.message || "No se pudo eliminar el tema en común.");
 
             await loadTopics();
             await loadCards();
             render();
           } catch (error) {
-            console.error("Error eliminando tópico:", error);
-            alert("No se pudo eliminar el tópico.\n\n" + error.message);
+            console.error("Error eliminando tema en común:", error);
+            alert("No se pudo eliminar el tema en común.\n\n" + error.message);
           }
         }
       };

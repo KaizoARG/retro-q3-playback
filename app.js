@@ -755,10 +755,11 @@ function subscribeToCards() {
     .on(
       "postgres_changes",
       {
-        event: "INSERT",
-        schema: "public",
-        table: "cards"
-      },
+	  event: "INSERT",
+	  schema: "public",
+	  table: "cards",
+	  filter: `retro_id=eq.${state.retroId}`
+	}
 
       (payload) => {
 

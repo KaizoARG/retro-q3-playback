@@ -894,8 +894,35 @@ async function releaseFacilitator() {
 
 async function startRetro() {
 
-  if (!state.isFacilitator) {
+  if (!state.retroId || !state.participantSessionId) {
     return;
+  }
+
+  // Antes de iniciar, sincronizamos con Supabase para evitar que
+  // el estado local quede desactualizado respecto del facilitador real.
+  await refreshRetroState();
+
+  // Si el facilitador se perdió por un refresh/race condition,
+  // intentamos reclamarlo nuevamente para esta misma sesión.
+  if (!state.isFacilitator) {
+    const { data: claimData, error: claimError } =
+      await supabaseClient.rpc("claim_facilitator", {
+        p_retro_id: state.retroId,
+        p_session_id: state.participantSessionId
+      });
+
+    if (claimError || !claimData?.is_facilitator) {
+      console.error("No se pudo confirmar el control de facilitación:", claimError || claimData);
+      alert(
+        "No se pudo iniciar la retro.\n\n" +
+        "La sesión actual no figura como facilitador. Volvé a tomar el control e intentá nuevamente."
+      );
+      await refreshRetroState();
+      render();
+      return;
+    }
+
+    await refreshRetroState();
   }
 
   const { data, error } = await supabaseClient
@@ -1204,7 +1231,8 @@ function facilitatorControls() {
               border-radius:10px;
               cursor:pointer;
               background:transparent;
-              border:1px solid currentColor;
+              border:1px solid #54FFD1;
+              color:#54FFD1;
             "
           >
             Liberar control

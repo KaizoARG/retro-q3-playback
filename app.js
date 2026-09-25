@@ -5,12 +5,14 @@ const supabaseClient = supabase.createClient(
   SUPABASE_URL,
   SUPABASE_KEY
 );
+
 const urlParams = new URLSearchParams(window.location.search);
 
 const RETRO_CODE =
   urlParams.get("retro") || "DEMO";
 
 console.log("Código de retro:", RETRO_CODE);
+
 
 // =====================================================
 // ESTADO
@@ -22,6 +24,7 @@ const state = {
   votes: {},
   cards: [],
   retroId: null,
+
   actions: [
     {
       text: "Alinear criterios de UAT antes de iniciar el sprint",
@@ -672,11 +675,7 @@ const screens = [
 
 
 // =====================================================
-// EVENTOS
-// =====================================================
-
-// =====================================================
-// CARGAR TARJETAS DESDE SUPABASE
+// CARGAR RETRO
 // =====================================================
 
 async function loadRetro() {
@@ -713,14 +712,19 @@ async function loadRetro() {
   return true;
 }
 
+
+// =====================================================
+// CARGAR TARJETAS DESDE SUPABASE
+// =====================================================
+
 async function loadCards() {
 
   const { data, error } =
     await supabaseClient
-    .from("cards")
-	.select("*")
-	.eq("retro_id", state.retroId)
-	.order("created_at", { ascending: true });
+      .from("cards")
+      .select("*")
+      .eq("retro_id", state.retroId)
+      .order("created_at", { ascending: true });
 
   if (error) {
 
@@ -734,8 +738,6 @@ async function loadCards() {
 
   state.cards = data || [];
 
-  // Si estamos en Cosecha,
-  // actualizamos la pantalla.
   if (state.step === 2) {
     render();
   }
@@ -750,16 +752,16 @@ async function loadCards() {
 function subscribeToCards() {
 
   supabaseClient
-    .channel("cards-realtime")
+    .channel("cards-realtime-" + state.retroId)
 
     .on(
       "postgres_changes",
       {
-	  event: "INSERT",
-	  schema: "public",
-	  table: "cards",
-	  filter: `retro_id=eq.${state.retroId}`
-	},
+        event: "INSERT",
+        schema: "public",
+        table: "cards",
+        filter: `retro_id=eq.${state.retroId}`
+      },
 
       (payload) => {
 
@@ -768,8 +770,6 @@ function subscribeToCards() {
           payload.new
         );
 
-        // Evitamos duplicarla si ya está
-        // cargada en nuestro estado.
         const exists =
           state.cards.some(
             card => card.id === payload.new.id
@@ -781,8 +781,6 @@ function subscribeToCards() {
             payload.new
           );
 
-          // Si estamos viendo Cosecha,
-          // actualizamos la pantalla.
           if (state.step === 2) {
             render();
           }
@@ -802,6 +800,11 @@ function subscribeToCards() {
     });
 
 }
+
+
+// =====================================================
+// EVENTOS
+// =====================================================
 
 async function bind() {
 
@@ -840,7 +843,6 @@ async function bind() {
         const k =
           b.dataset.topic;
 
-
         if ((state.votes[k] || 0) < 3) {
 
           state.votes[k] =
@@ -848,80 +850,85 @@ async function bind() {
 
         }
 
-
         render();
 
       };
 
     });
 
-// ===================================================
-// COSECHA - AGREGAR TARJETA
-// ===================================================
 
-const addCard = document.querySelector("#addCard");
 
-if (addCard) {
+  // ===================================================
+  // COSECHA - AGREGAR TARJETA
+  // ===================================================
 
-  addCard.onclick = async () => {
+  const addCard =
+    document.querySelector("#addCard");
 
-    const text =
-      document
-        .querySelector("#cardText")
-        .value
-        .trim();
+  if (addCard) {
 
-    const type =
-      document
-        .querySelector("#cardType")
-        .value;
+    addCard.onclick = async () => {
 
-    if (!text) {
-      alert("Escribí algo antes de agregar la tarjeta.");
-      return;
-    }
+      const text =
+        document
+          .querySelector("#cardText")
+          .value
+          .trim();
 
-	const { data, error } =
-	  await supabaseClient
-		.from("acciones")
-		.insert({
+      const type =
+        document
+          .querySelector("#cardType")
+          .value;
 
-		  descripcion: t,
-		  responsable: owner,
-		  fecha: date,
-		  retro_id: state.retroId
+      if (!text) {
 
-		})
-		.select()
-		.single();
+        alert(
+          "Escribí algo antes de agregar la tarjeta."
+        );
 
-    if (error) {
+        return;
+      }
 
-      console.error(
-        "Error guardando tarjeta:",
-        error
+      const { data, error } =
+        await supabaseClient
+          .from("cards")
+          .insert({
+            contenido: text,
+            etapa: type,
+            retro_id: state.retroId
+          })
+          .select()
+          .single();
+
+      if (error) {
+
+        console.error(
+          "Error guardando tarjeta:",
+          error
+        );
+
+        alert(
+          "No se pudo guardar la tarjeta.\n\n" +
+          error.message
+        );
+
+        return;
+      }
+
+      console.log(
+        "Tarjeta guardada:",
+        data
       );
 
-      alert(
-        "No se pudo guardar la tarjeta.\n\n" +
-        error.message
-      );
+      state.cards.push(data);
 
-      return;
-    }
+      render();
 
-    console.log(
-      "Tarjeta guardada:",
-      data
-    );
+    };
 
-    state.cards.push(data);
+  }
 
-    render();
 
-  };
-
-}
 
   // ===================================================
   // ACCIONES
@@ -930,11 +937,9 @@ if (addCard) {
   const add =
     document.querySelector("#addAction");
 
-
   if (add) {
 
     add.onclick = async () => {
-
 
       const t =
         document
@@ -942,9 +947,9 @@ if (addCard) {
           .value
           .trim();
 
-
-      if (!t) return;
-
+      if (!t) {
+        return;
+      }
 
       const owner =
         document
@@ -953,7 +958,6 @@ if (addCard) {
           .trim()
         || "Por definir";
 
-
       const date =
         document
           .querySelector("#actionDate")
@@ -961,26 +965,21 @@ if (addCard) {
         || null;
 
 
-      /*
-       * GUARDAR EN SUPABASE
-       *
-       * Por ahora no usamos retro_id
-       * porque todavía no implementamos las salas.
-       */
+      // =================================================
+      // GUARDAR ACCIÓN EN SUPABASE
+      // =================================================
 
-	const { data, error } =
-	  await supabaseClient
-		.from("acciones")
-		.insert({
-
-		  descripcion: t,
-		  responsable: owner,
-		  fecha: date,
-		  retro_id: state.retroId
-
-		})
-		.select()
-		.single();
+      const { data, error } =
+        await supabaseClient
+          .from("acciones")
+          .insert({
+            descripcion: t,
+            responsable: owner,
+            fecha: date,
+            retro_id: state.retroId
+          })
+          .select()
+          .single();
 
 
       if (error) {
@@ -1009,7 +1008,6 @@ if (addCard) {
           error?.hint
         );
 
-
         alert(
           "ERROR SUPABASE\n\n" +
 
@@ -1023,9 +1021,7 @@ if (addCard) {
           (error?.details || "N/A")
         );
 
-
         return;
-
       }
 
 
@@ -1067,7 +1063,6 @@ document
   .querySelector("#nextBtn")
   .onclick = () => {
 
-
     if (
       state.step ===
       steps.length - 1
@@ -1102,7 +1097,6 @@ document
   .querySelector("#backBtn")
   .onclick = () => {
 
-
     if (state.step > 0) {
 
       state.step--;
@@ -1120,7 +1114,8 @@ document
 
 async function initialize() {
 
-  const retroLoaded = await loadRetro();
+  const retroLoaded =
+    await loadRetro();
 
   if (!retroLoaded) {
     return;

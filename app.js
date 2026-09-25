@@ -25,14 +25,7 @@ const state = {
   cards: [],
   retroId: null,
 
-  actions: [
-    {
-      text: "Alinear criterios de UAT antes de iniciar el sprint",
-      owner: "María",
-      date: "04/10"
-    }
-  ]
-};
+	actions: []
 
 
 // =====================================================
@@ -719,6 +712,49 @@ async function loadRetro() {
 
 async function loadCards() {
 
+async function loadActions() {
+
+  const { data, error } =
+    await supabaseClient
+      .from("acciones")
+      .select("*")
+      .eq("retro_id", state.retroId)
+      .order("created_at", { ascending: true });
+
+  if (error) {
+
+    console.error(
+      "Error cargando acciones:",
+      error
+    );
+
+    return;
+  }
+
+  state.actions = (data || []).map(action => ({
+
+    id: action.id,
+
+    text: action.descripcion,
+
+    owner: action.responsable,
+
+    date:
+      action.fecha || "Por definir"
+
+  }));
+
+  console.log(
+    "Acciones cargadas:",
+    state.actions
+  );
+
+  if (state.step === 6 || state.step === 7) {
+    render();
+  }
+
+}
+
   const { data, error } =
     await supabaseClient
       .from("cards")
@@ -1122,6 +1158,8 @@ async function initialize() {
   }
 
   await loadCards();
+
+  await loadActions();
 
   subscribeToCards();
 

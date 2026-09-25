@@ -454,6 +454,20 @@ function lobbyScreen() {
   const currentName = getParticipantName();
   const currentReady = isParticipantReady();
 
+  const sortedParticipants = [...state.participants].sort((a, b) => {
+    const aIsFacilitator = a.session_id === state.facilitatorSessionId;
+    const bIsFacilitator = b.session_id === state.facilitatorSessionId;
+
+    if (aIsFacilitator && !bIsFacilitator) return -1;
+    if (!aIsFacilitator && bIsFacilitator) return 1;
+
+    return (a.nombre || "").localeCompare(
+      b.nombre || "",
+      "es",
+      { sensitivity: "base" }
+    );
+  });
+
   return `
     <section>
 
@@ -525,30 +539,53 @@ function lobbyScreen() {
           ${
             state.participants.length === 0
               ? `<p style="margin:0;opacity:.65;">Todavía no hay participantes.</p>`
-              : state.participants.map(participant => `
-                <div
-                  style="
-                    display:flex;
-                    align-items:center;
-                    justify-content:space-between;
-                    gap:12px;
-                    padding:10px 0;
-                    border-bottom:1px solid rgba(255,255,255,.07);
-                  ">
-                  <span>
-                    ${escapeHtml(participant.nombre || "Sin identificar")}
-                  </span>
-                  <span
-                    class="badge"
-                    style="
-                      ${participant.listo
-                        ? "border-color:rgba(84,255,209,.3);"
-                        : "opacity:.65;"}
-                    ">
-                    ${participant.listo ? "✓ Listo" : "○ Pendiente"}
-                  </span>
-                </div>
-              `).join("")
+              : sortedParticipants.map(participant => {
+                  const isFacilitator =
+                    participant.session_id === state.facilitatorSessionId;
+
+                  return `
+                    <div
+                      style="
+                        display:flex;
+                        align-items:center;
+                        justify-content:space-between;
+                        gap:12px;
+                        padding:10px 0;
+                        border-bottom:1px solid rgba(255,255,255,.07);
+                      ">
+                      <div style="display:flex;align-items:center;gap:9px;min-width:0;">
+                        ${isFacilitator ? `
+                          <span
+                            title="Facilitador"
+                            aria-label="Facilitador"
+                            style="font-size:18px;line-height:1;">
+                            👑
+                          </span>
+                        ` : ""}
+                        <div style="min-width:0;">
+                          <div style="font-weight:${isFacilitator ? "700" : "500"};">
+                            ${escapeHtml(participant.nombre || "Sin identificar")}
+                          </div>
+                          ${isFacilitator ? `
+                            <div style="font-size:11px;letter-spacing:.06em;text-transform:uppercase;opacity:.6;margin-top:2px;">
+                              Facilitador
+                            </div>
+                          ` : ""}
+                        </div>
+                      </div>
+                      <span
+                        class="badge"
+                        style="
+                          flex-shrink:0;
+                          ${participant.listo
+                            ? "border-color:rgba(84,255,209,.3);"
+                            : "opacity:.65;"}
+                        ">
+                        ${participant.listo ? "✓ Listo" : "○ Pendiente"}
+                      </span>
+                    </div>
+                  `;
+                }).join("")
           }
         </div>
 

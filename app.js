@@ -196,7 +196,7 @@ function buildGuidingQuestionSuggestions(topic, cards) {
   const suggestions = [
     `¿Qué patrón común hay detrás de las situaciones vinculadas a ${quotedLabel}${focus}?`,
     redCount > 0
-      ? `¿Qué condición de nuestro sistema de trabajo está generando o sosteniendo los problemas asociados a ${label}?`
+      ? `¿Qué condición de nuestro sistema de trabajo está generando o sosteniendo los problemas asociados a ${quotedLabel}?`
       : `¿Qué parte de nuestra forma de trabajar podríamos cambiar para mejorar lo que aparece alrededor de ${quotedLabel}?`,
     blueCount > 0
       ? `¿Qué aprendimos de estas situaciones que deberíamos incorporar a nuestra forma de trabajar para que ${quotedLabel} evolucione?`

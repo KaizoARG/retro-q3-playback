@@ -3483,7 +3483,7 @@ function adminRetroRow(retro) {
         <button class="admin-toggle-public-btn" data-retro-id="${retro.id}" data-publicada="${published}" style="padding:9px 13px">
           ${published ? "Archivar" : "Publicar"}
         </button>
-        <button class="admin-delete-retro-btn" data-retro-id="${retro.id}" data-retro-label="${teams} · ${date}" style="padding:9px 13px;border-color:rgba(255,100,100,.35);color:#ff9b9b">
+        <button class="admin-delete-retro-btn" data-retro-id="${retro.id}" data-retro-label="${teams} · ${date}" style="padding:9px 13px;border-color:rgba(255,100,100,.35);color:#c30909">
           Eliminar
         </button>
       </div>

@@ -6,6 +6,11 @@ const supabaseClient = supabase.createClient(
   SUPABASE_KEY
 );
 
+
+// =====================================================
+// RETRO ACTUAL
+// =====================================================
+
 const urlParams = new URLSearchParams(window.location.search);
 
 const RETRO_CODE =
@@ -21,11 +26,43 @@ console.log("Código de retro:", RETRO_CODE);
 const state = {
   step: 0,
   energy: null,
+
+  // Votos acumulados de todos los participantes
   votes: {},
+
+  // Votos realizados por ESTE navegador
+  myVotes: {},
+
   cards: [],
   retroId: null,
   actions: []
 };
+
+
+// =====================================================
+// CONFIGURACIÓN DE VOTACIÓN
+// =====================================================
+
+const MAX_VOTES_PER_PARTICIPANT = 3;
+
+const voteTopics = [
+  {
+    key: "dependencias",
+    label: "Dependencias entre equipos"
+  },
+  {
+    key: "calidad",
+    label: "Calidad y UAT"
+  },
+  {
+    key: "priorizacion",
+    label: "Priorización y foco"
+  },
+  {
+    key: "metricas",
+    label: "Visibilidad de métricas"
+  }
+];
 
 
 // =====================================================
@@ -217,7 +254,6 @@ const screens = [
       class="columns"
       style="margin-top:30px">
 
-
       <!-- FUNCIONÓ -->
 
       <div class="column">
@@ -240,11 +276,9 @@ const screens = [
           state.cards
             .filter(c => c.etapa === "green")
             .map(c => `
-
               <div class="sticky">
                 ${c.contenido}
               </div>
-
             `)
             .join("")
         }
@@ -274,11 +308,9 @@ const screens = [
           state.cards
             .filter(c => c.etapa === "red")
             .map(c => `
-
               <div class="sticky">
                 ${c.contenido}
               </div>
-
             `)
             .join("")
         }
@@ -308,11 +340,9 @@ const screens = [
           state.cards
             .filter(c => c.etapa === "blue")
             .map(c => `
-
               <div class="sticky">
                 ${c.contenido}
               </div>
-
             `)
             .join("")
         }
@@ -352,9 +382,7 @@ const screens = [
         "Priorización y foco",
         "Visibilidad de métricas"
       ]
-
       .map((x,i) =>
-
         `<div class="topic">
 
           <strong>
@@ -366,7 +394,6 @@ const screens = [
           </span>
 
         </div>`
-
       ).join("")}
 
     </div>
@@ -378,105 +405,172 @@ const screens = [
   // 5. VOTACIÓN
   // ===================================================
 
-  () => `<section>
+  () => {
 
-    <div class="eyebrow">
-      Votación
-    </div>
+    const usedVotes =
+      Object.values(state.myVotes)
+        .reduce((sum, value) => sum + value, 0);
 
-    <h2>
-      ¿Dónde deberíamos poner energía?
-    </h2>
+    const remainingVotes =
+      Math.max(
+        0,
+        MAX_VOTES_PER_PARTICIPANT - usedVotes
+      );
 
-    <p class="lead">
-      Tenés 3 votos. Elegí los temas que consideres
-      más importantes para conversar.
-    </p>
+    return `<section>
 
-    <div class="topic-list">
+      <div class="eyebrow">
+        Votación
+      </div>
 
-      ${[
-        "Dependencias entre equipos",
-        "Calidad y UAT",
-        "Priorización y foco",
-        "Visibilidad de métricas"
-      ]
+      <h2>
+        ¿Dónde deberíamos poner energía?
+      </h2>
 
-      .map((x,i) =>
+      <p class="lead">
+        Tenés 3 votos. Elegí los temas que consideres
+        más importantes para conversar.
+      </p>
 
-        `<div class="topic">
+      <div
+        class="badge"
+        style="margin:20px 0">
 
-          <strong>
-            ${x}
-          </strong>
+        Te quedan
+        <strong>
+          ${remainingVotes}
+        </strong>
+        voto${remainingVotes === 1 ? "" : "s"}
 
-          <button
-            class="primary vote"
-            data-topic="${i}">
+      </div>
 
-            Votar · ${state.votes[i] || 0}
+      <div class="topic-list">
 
-          </button>
+        ${voteTopics
+          .map(topic => {
 
-        </div>`
+            const totalVotes =
+              state.votes[topic.key] || 0;
 
-      ).join("")}
+            const myVotes =
+              state.myVotes[topic.key] || 0;
 
-    </div>
+            const disabled =
+              remainingVotes === 0;
 
-  </section>`,
+            return `
+              <div class="topic">
+
+                <div>
+
+                  <strong>
+                    ${topic.label}
+                  </strong>
+
+                  <div class="badge">
+                    ${totalVotes}
+                    voto${totalVotes === 1 ? "" : "s"}
+                    ${
+                      myVotes > 0
+                        ? ` · vos: ${myVotes}`
+                        : ""
+                    }
+                  </div>
+
+                </div>
+
+                <button
+                  class="primary vote"
+                  data-topic="${topic.key}"
+                  ${disabled ? "disabled" : ""}>
+
+                  ${
+                    disabled
+                      ? "Sin votos"
+                      : "Votar +1"
+                  }
+
+                </button>
+
+              </div>
+            `;
+          })
+          .join("")}
+
+      </div>
+
+    </section>`;
+  },
 
 
   // ===================================================
   // 6. CONVERSACIÓN
   // ===================================================
 
-  () => `<section>
+  () => {
 
-    <div class="eyebrow">
-      Conversación
-    </div>
+    const topTopic =
+      voteTopics
+        .slice()
+        .sort(
+          (a,b) =>
+            (state.votes[b.key] || 0) -
+            (state.votes[a.key] || 0)
+        )[0];
 
-    <h2>
-      Dependencias entre equipos
-    </h2>
+    const topTopicVotes =
+      topTopic
+        ? state.votes[topTopic.key] || 0
+        : 0;
 
-    <p class="lead">
-      Este tema recibió más votos en el ejemplo.
-      La pregunta ahora no es solamente qué pasó,
-      sino qué hay detrás.
-    </p>
+    return `<section>
 
-    <div
-      class="card"
-      style="margin-top:34px">
+      <div class="eyebrow">
+        Conversación
+      </div>
 
-      <h3>
-        Preguntas guía
-      </h3>
+      <h2>
+        ${topTopic ? topTopic.label : "Tema principal"}
+      </h2>
 
-      <p>
-
-        ¿Dónde aparece la dependencia?
-
-        <br><br>
-
-        ¿Qué información llega tarde?
-
-        <br><br>
-
-        ¿Qué decisión podría tomarse antes?
-
-        <br><br>
-
-        ¿Qué necesitamos cambiar
-        en nuestro sistema de trabajo?
-
+      <p class="lead">
+        Este tema recibió ${topTopicVotes}
+        voto${topTopicVotes === 1 ? "" : "s"}.
+        La pregunta ahora no es solamente qué pasó,
+        sino qué hay detrás.
       </p>
 
-    </div>
+      <div
+        class="card"
+        style="margin-top:34px">
 
-  </section>`,
+        <h3>
+          Preguntas guía
+        </h3>
+
+        <p>
+
+          ¿Dónde aparece la dependencia?
+
+          <br><br>
+
+          ¿Qué información llega tarde?
+
+          <br><br>
+
+          ¿Qué decisión podría tomarse antes?
+
+          <br><br>
+
+          ¿Qué necesitamos cambiar
+          en nuestro sistema de trabajo?
+
+        </p>
+
+      </div>
+
+    </section>`;
+  },
 
 
   // ===================================================
@@ -533,7 +627,6 @@ const screens = [
       ${
         state.actions
           .map(a =>
-
             `<div class="action">
 
               <div>
@@ -549,7 +642,6 @@ const screens = [
               </div>
 
             </div>`
-
           )
           .join("")
       }
@@ -569,6 +661,15 @@ const screens = [
       state.actions.length > 0
         ? state.actions[state.actions.length - 1]
         : null;
+
+    const topTopic =
+      voteTopics
+        .slice()
+        .sort(
+          (a,b) =>
+            (state.votes[b.key] || 0) -
+            (state.votes[a.key] || 0)
+        )[0];
 
     return `<section class="center">
 
@@ -598,12 +699,19 @@ const screens = [
           </div>
 
           <h3>
-            Dependencias entre equipos
+            ${
+              topTopic
+                ? topTopic.label
+                : "Todavía no hay votos"
+            }
           </h3>
 
           <p>
-            Necesitamos anticipar dependencias
-            y hacerlas visibles antes de comprometer trabajo.
+            ${
+              topTopic
+                ? `${state.votes[topTopic.key] || 0} votos`
+                : "Votá un tema para definirlo."
+            }
           </p>
 
         </div>
@@ -689,7 +797,7 @@ async function loadRetro() {
 
 
 // =====================================================
-// CARGAR TARJETAS DESDE SUPABASE
+// CARGAR TARJETAS
 // =====================================================
 
 async function loadCards() {
@@ -719,12 +827,11 @@ async function loadCards() {
     "Tarjetas cargadas:",
     state.cards
   );
-
 }
 
 
 // =====================================================
-// CARGAR ACCIONES DESDE SUPABASE
+// CARGAR ACCIONES
 // =====================================================
 
 async function loadActions() {
@@ -751,7 +858,8 @@ async function loadActions() {
   state.actions =
     (data || []).map(action => ({
 
-      id: action.id,
+      id:
+        action.id,
 
       text:
         action.descripcion,
@@ -768,12 +876,105 @@ async function loadActions() {
     "Acciones cargadas:",
     state.actions
   );
-
 }
 
 
 // =====================================================
-// REALTIME - ESCUCHAR NUEVAS TARJETAS
+// CARGAR VOTOS
+// =====================================================
+
+async function loadVotes() {
+
+  const { data, error } =
+    await supabaseClient
+      .from("votos")
+      .select("*")
+      .eq("retro_id", state.retroId);
+
+  if (error) {
+
+    console.error(
+      "Error cargando votos:",
+      error
+    );
+
+    return;
+  }
+
+  state.votes = {};
+
+  (data || []).forEach(row => {
+
+    state.votes[row.topic_key] =
+      row.votos || 0;
+
+  });
+
+  console.log(
+    "Votos cargados:",
+    state.votes
+  );
+}
+
+
+// =====================================================
+// CARGAR MIS VOTOS DESDE LOCALSTORAGE
+// =====================================================
+
+function loadMyVotes() {
+
+  if (!state.retroId) {
+    return;
+  }
+
+  const storageKey =
+    `retro-my-votes-${state.retroId}`;
+
+  try {
+
+    const saved =
+      localStorage.getItem(storageKey);
+
+    state.myVotes =
+      saved
+        ? JSON.parse(saved)
+        : {};
+
+  } catch (error) {
+
+    console.error(
+      "Error cargando votos locales:",
+      error
+    );
+
+    state.myVotes = {};
+  }
+
+  console.log(
+    "Mis votos:",
+    state.myVotes
+  );
+}
+
+
+// =====================================================
+// GUARDAR MIS VOTOS
+// =====================================================
+
+function saveMyVotes() {
+
+  const storageKey =
+    `retro-my-votes-${state.retroId}`;
+
+  localStorage.setItem(
+    storageKey,
+    JSON.stringify(state.myVotes)
+  );
+}
+
+
+// =====================================================
+// REALTIME - CARDS
 // =====================================================
 
 function subscribeToCards() {
@@ -817,9 +1018,7 @@ function subscribeToCards() {
           if (state.step === 2) {
             render();
           }
-
         }
-
       }
     )
 
@@ -831,7 +1030,68 @@ function subscribeToCards() {
       );
 
     });
+}
 
+
+// =====================================================
+// REALTIME - VOTOS
+// =====================================================
+
+function subscribeToVotes() {
+
+  supabaseClient
+
+    .channel(
+      "votes-realtime-" +
+      state.retroId
+    )
+
+    .on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "votos",
+        filter:
+          `retro_id=eq.${state.retroId}`
+      },
+
+      (payload) => {
+
+        console.log(
+          "Cambio de votos recibido:",
+          payload
+        );
+
+        const row =
+          payload.new;
+
+        if (!row) {
+          return;
+        }
+
+        state.votes[row.topic_key] =
+          row.votos || 0;
+
+        if (
+          state.step === 4 ||
+          state.step === 5 ||
+          state.step === 7
+        ) {
+          render();
+        }
+
+      }
+    )
+
+    .subscribe((status) => {
+
+      console.log(
+        "Realtime votos:",
+        status
+      );
+
+    });
 }
 
 
@@ -870,17 +1130,89 @@ async function bind() {
     .querySelectorAll(".vote")
     .forEach(b => {
 
-      b.onclick = () => {
+      b.onclick = async () => {
 
-        const k =
+        const topicKey =
           b.dataset.topic;
 
+        const usedVotes =
+          Object.values(state.myVotes)
+            .reduce(
+              (sum, value) =>
+                sum + value,
+              0
+            );
+
         if (
-          (state.votes[k] || 0) < 3
+          usedVotes >=
+          MAX_VOTES_PER_PARTICIPANT
         ) {
 
-          state.votes[k] =
-            (state.votes[k] || 0) + 1;
+          alert(
+            "Ya utilizaste tus 3 votos."
+          );
+
+          return;
+        }
+
+
+        // ---------------------------------------------
+        // Incrementar voto en Supabase
+        // ---------------------------------------------
+
+        const { data, error } =
+          await supabaseClient
+            .rpc(
+              "increment_vote",
+              {
+                p_retro_id:
+                  state.retroId,
+
+                p_topic_key:
+                  topicKey
+              }
+            );
+
+        if (error) {
+
+          console.error(
+            "Error guardando voto:",
+            error
+          );
+
+          alert(
+            "No se pudo registrar el voto.\n\n" +
+            error.message
+          );
+
+          return;
+        }
+
+
+        console.log(
+          "Voto guardado:",
+          data
+        );
+
+
+        // ---------------------------------------------
+        // Actualizar votos locales del participante
+        // ---------------------------------------------
+
+        state.myVotes[topicKey] =
+          (state.myVotes[topicKey] || 0) + 1;
+
+        saveMyVotes();
+
+
+        // ---------------------------------------------
+        // Actualizar contador global inmediatamente
+        // ---------------------------------------------
+
+        if (data) {
+
+          state.votes[data.topic_key] =
+            data.votos;
 
         }
 
@@ -961,7 +1293,11 @@ async function bind() {
         );
 
       if (!exists) {
-        state.cards.push(data);
+
+        state.cards.push(
+          data
+        );
+
       }
 
       render();
@@ -1133,6 +1469,8 @@ document
 
       state.votes = {};
 
+      loadVotes();
+
       render();
 
     }
@@ -1187,11 +1525,21 @@ async function initialize() {
   await loadActions();
 
 
+  await loadVotes();
+
+
+  loadMyVotes();
+
+
   subscribeToCards();
+
+
+  subscribeToVotes();
 
 
   render();
 
 }
+
 
 initialize();

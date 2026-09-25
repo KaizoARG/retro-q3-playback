@@ -96,10 +96,29 @@ function normalizeTopicText(value) {
 }
 
 
+function stemTopicToken(token) {
+  let value = String(token || "");
+  if (value.length <= 4) return value;
+
+  const suffixes = [
+    "amientos", "imiento", "imientos", "aciones", "acion",
+    "mente", "ando", "iendo", "ados", "adas", "idos", "idas",
+    "es", "os", "as", "s"
+  ];
+
+  for (const suffix of suffixes) {
+    if (value.endsWith(suffix) && value.length - suffix.length >= 4) {
+      return value.slice(0, -suffix.length);
+    }
+  }
+
+  return value;
+}
+
 function getMeaningfulTokens(value) {
   return normalizeTopicText(value)
     .split(" ")
-    .map(token => token.trim())
+    .map(token => stemTopicToken(token.trim()))
     .filter(token =>
       token.length >= 4 &&
       !TOPIC_STOP_WORDS.has(token) &&
@@ -177,14 +196,18 @@ function buildDynamicTopics(cards) {
     tokens: new Set(getMeaningfulTokens(card.contenido))
   }));
 
-  const frequencies = new Map();
+  if (!prepared.length) {
+    return { candidates: [], assignments: new Map() };
+  }
 
+  const frequencies = new Map();
   prepared.forEach(item => {
     item.tokens.forEach(token => {
       frequencies.set(token, (frequencies.get(token) || 0) + 1);
     });
   });
 
+  // 1. Detectar temas a partir de palabras/raíces repetidas.
   const candidateTokens = Array.from(frequencies.entries())
     .filter(([, count]) => count >= 2)
     .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
@@ -192,61 +215,57 @@ function buildDynamicTopics(cards) {
   const candidates = [];
   const usedTokens = new Set();
 
-  candidateTokens.forEach(([token, count]) => {
-    if (candidates.length >= 6 || usedTokens.has(token)) return;
+  candidateTokens.forEach(([token]) => {
+    if (candidates.length >= 8 || usedTokens.has(token)) return;
 
     const matching = prepared.filter(item => item.tokens.has(token));
-
     if (matching.length < 2) return;
 
     const related = Array.from(
-      new Set(
-        matching.flatMap(item => Array.from(item.tokens))
-      )
+      new Set(matching.flatMap(item => Array.from(item.tokens)))
     )
-      .filter(other => other !== token && (frequencies.get(other) || 0) >= 2)
+      .filter(other =>
+        other !== token &&
+        !usedTokens.has(other) &&
+        (frequencies.get(other) || 0) >= 2
+      )
       .sort((a, b) =>
-        ((frequencies.get(b) || 0) - (frequencies.get(a) || 0)) ||
+        (frequencies.get(b) || 0) - (frequencies.get(a) || 0) ||
         a.localeCompare(b)
       );
 
-    const second = related.find(other => !usedTokens.has(other));
+    const second = related[0];
     const label = second
       ? `${titleCaseTopic(token)} · ${titleCaseTopic(second)}`
       : titleCaseTopic(token);
 
-    candidates.push({
-      token,
-      label,
-      cards: matching
-    });
-
+    candidates.push({ label, cards: matching });
     usedTokens.add(token);
     if (second) usedTokens.add(second);
   });
 
-  // Fallback: si no hay palabras repetidas, buscar pequeños grupos por similitud.
+  // 2. Si no hubo palabras repetidas, agrupar por similitud entre tarjetas.
+  //    El umbral es deliberadamente bajo para que la agrupación no quede vacía.
   if (candidates.length === 0) {
     const unused = new Set(prepared.map(item => item.card.id));
 
-    while (unused.size >= 2 && candidates.length < 6) {
+    while (unused.size >= 2 && candidates.length < 8) {
       const seedId = unused.values().next().value;
       const seed = prepared.find(item => item.card.id === seedId);
-
       if (!seed) break;
 
       const matches = prepared.filter(item => {
         if (!unused.has(item.card.id) || item.card.id === seedId) return false;
+
         const intersection = Array.from(seed.tokens)
           .filter(token => item.tokens.has(token)).length;
-        const union = new Set([
-          ...seed.tokens,
-          ...item.tokens
-        ]).size;
-        return union > 0 && intersection / union >= 0.25;
+        const union = new Set([...seed.tokens, ...item.tokens]).size;
+        const similarity = union ? intersection / union : 0;
+
+        return similarity >= 0.15;
       });
 
-      if (matches.length === 0) {
+      if (!matches.length) {
         unused.delete(seedId);
         continue;
       }
@@ -263,7 +282,6 @@ function buildDynamicTopics(cards) {
         .map(([token]) => titleCaseTopic(token));
 
       candidates.push({
-        token: words[0] || "Tema",
         label: words.join(" · ") || "Tema",
         cards: topicCards
       });
@@ -289,11 +307,40 @@ function buildDynamicTopics(cards) {
     });
   });
 
+  // 3. Garantizar que ninguna tarjeta quede invisible después de generar.
+  //    Si una tarjeta no comparte suficientes conceptos con otra, se crea
+  //    un tópico individual basado en sus palabras más relevantes.
+  prepared.forEach(item => {
+    if (assignments.has(item.card.id)) return;
+
+    const words = Array.from(item.tokens)
+      .sort((a, b) =>
+        (frequencies.get(b) || 0) - (frequencies.get(a) || 0) ||
+        a.localeCompare(b)
+      )
+      .slice(0, 2)
+      .map(titleCaseTopic);
+
+    const label = words.join(" · ") || "Tema sin definir";
+    assignments.set(item.card.id, {
+      key: topicKeyFromLabel(label),
+      label,
+      count: 1
+    });
+  });
+
+  const uniqueTopics = new Map();
+  assignments.forEach(assignment => {
+    if (!uniqueTopics.has(assignment.key)) {
+      uniqueTopics.set(assignment.key, {
+        key: assignment.key,
+        label: assignment.label
+      });
+    }
+  });
+
   return {
-    candidates: candidates.map(candidate => ({
-      key: topicKeyFromLabel(candidate.label),
-      label: candidate.label
-    })),
+    candidates: Array.from(uniqueTopics.values()),
     assignments
   };
 }
@@ -3393,14 +3440,18 @@ async function bind() {
       generateTopicsBtn.disabled = true;
       generateTopicsBtn.textContent = "Generando…";
 
-      const { assignments } = buildDynamicTopics(state.cards);
-
-      const updates = state.cards.map(card => ({
-        id: card.id,
-        topic_key: assignments.get(card.id)?.key || null
-      }));
-
       try {
+        const { candidates, assignments } = buildDynamicTopics(state.cards);
+
+        if (!assignments.size) {
+          throw new Error("No se pudieron detectar temas en las tarjetas.");
+        }
+
+        const updates = state.cards.map(card => ({
+          id: card.id,
+          topic_key: assignments.get(card.id)?.key || null
+        }));
+
         for (const update of updates) {
           const { error } = await supabaseClient
             .from("cards")
@@ -3412,6 +3463,11 @@ async function bind() {
 
         await loadCards();
         render();
+
+        console.log(
+          "Tópicos generados:",
+          candidates.map(topic => topic.label)
+        );
       } catch (error) {
         console.error("Error generando tópicos:", error);
         alert(

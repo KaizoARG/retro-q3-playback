@@ -3780,6 +3780,39 @@ function bindLanding() {
     };
   });
 
+
+  document.querySelectorAll(".landing-feedback-btn:not(.landing-disabled-action)").forEach(btn => {
+    btn.onclick = async () => {
+      btn.disabled = true;
+
+      const { data: feedbackRows, error } = await supabaseClient
+        .from("retro_feedback")
+        .select("id, rating, observaciones, feedback_herramienta")
+        .eq("retro_id", btn.dataset.retroId)
+        .order("created_at", { ascending: true });
+
+      btn.disabled = false;
+      if (error) return alert("No se pudo cargar el feedback.\n\n" + error.message);
+
+      const rows = feedbackRows || [];
+      const numericRatings = rows
+        .map(row => Number(row.rating))
+        .filter(Number.isFinite);
+      const averageRating = numericRatings.length
+        ? numericRatings.reduce((sum, rating) => sum + rating, 0) / numericRatings.length
+        : null;
+      const retro = landingRetros.find(item => String(item.id) === String(btn.dataset.retroId)) || {};
+
+      landingSelectedRetro = {
+        retro,
+        feedback: rows,
+        average_rating: averageRating
+      };
+      landingView = "feedback";
+      renderLanding();
+    };
+  });
+
   const createBtn = document.querySelector("#createRetroBtn");
   if (createBtn) createBtn.onclick = async () => {
     const teams = document.querySelector("#retroTeams")?.value.trim();

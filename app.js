@@ -3476,10 +3476,23 @@ function formatLandingDate(value) {
 
 function landingShell(content) {
   const app = document.querySelector("#app");
+  const topbar = document.querySelector(".topbar");
   const stepLabel = document.querySelector("#stepLabel");
   const progressBar = document.querySelector("#progressBar");
   const backBtn = document.querySelector("#backBtn");
   const nextBtn = document.querySelector("#nextBtn");
+
+  if (topbar) {
+    topbar.innerHTML = `
+      <div class="brand"><span class="brand-dot"></span> RETROS</div>
+      ${landingView === "home" ? `
+        <nav style="margin-left:auto;display:flex;align-items:center;gap:10px">
+          <button id="landingHistoryNavBtn" class="ghost" style="padding:10px 14px;border:1px solid rgba(255,255,255,.14);border-radius:10px;cursor:pointer">Ver retros</button>
+          <button id="landingNewRetroNavBtn" class="primary" style="padding:10px 14px;border-radius:10px;border:0;cursor:pointer">+ Nueva retro</button>
+        </nav>
+      ` : ""}
+    `;
+  }
 
   if (stepLabel) stepLabel.textContent = "";
   if (progressBar) progressBar.style.width = "0%";
@@ -3510,7 +3523,7 @@ function landingHome() {
         </div>
       </div>
 
-      <div style="margin-top:58px" class="card">
+      <div id="landingHistorySection" style="margin-top:58px" class="card">
         <div style="display:flex;justify-content:space-between;align-items:end;gap:16px;flex-wrap:wrap">
           <div><div class="eyebrow">Historial</div><h2 style="margin:8px 0 0">Retrospectivas anteriores</h2></div>
           <button id="newRetroBtn" class="primary" style="padding:12px 18px">+ Crear nueva retro</button>
@@ -3666,6 +3679,22 @@ async function renderLanding() {
 }
 
 function bindLanding() {
+  const historyNavBtn = document.querySelector("#landingHistoryNavBtn");
+  if (historyNavBtn) {
+    historyNavBtn.onclick = () => {
+      const historySection = document.querySelector("#landingHistorySection");
+      if (historySection) historySection.scrollIntoView({ behavior: "smooth", block: "start" });
+    };
+  }
+
+  const newRetroNavBtn = document.querySelector("#landingNewRetroNavBtn");
+  if (newRetroNavBtn) {
+    newRetroNavBtn.onclick = () => {
+      landingView = "create";
+      renderLanding();
+    };
+  }
+
   const back = document.querySelector("#landingBackBtn");
   if (back) back.onclick = async () => { landingView = "home"; await loadLandingRetros(); renderLanding(); };
 

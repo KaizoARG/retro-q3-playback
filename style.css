@@ -12,6 +12,7 @@ button,input,textarea { font:inherit; }
 .topbar { height:72px; display:flex; align-items:center; gap:28px; padding:0 5vw; border-bottom:1px solid var(--line); }
 .brand { font-weight:800; letter-spacing:.12em; }
 .brand-dot { display:inline-block; width:9px; height:9px; border-radius:50%; background:white; margin-right:8px; }
+.session { color:var(--muted); font-size:12px; letter-spacing:.1em; }
 .progress { margin-left:auto; width:180px; height:4px; background:#20232b; border-radius:99px; overflow:hidden; }
 .progress span { display:block; height:100%; width:12.5%; background:white; transition:.35s; }
 main { width:min(1120px,90vw); margin:auto; padding:70px 0 110px; flex:1; }
@@ -59,48 +60,34 @@ textarea { min-height:100px; resize:vertical; }
   main { width:90vw; padding-top:45px; } .grid,.columns,.summary,.action-form { grid-template-columns:1fr; }
   h1 { font-size:48px; } .footer { padding:0 20px; }
 }
-/* Principios de la retro */
-.retro-principles { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; margin-top:38px; }
-.principle-card { background:var(--panel); border:1px solid var(--line); border-radius:18px; padding:22px; }
-.principle-card h3 { margin:0 0 16px; font-size:17px; }
-.capsules { display:flex; flex-wrap:wrap; gap:9px; }
-.capsule { display:inline-flex; align-items:center; min-height:34px; padding:7px 13px; border:1px solid var(--line); border-radius:999px; background:var(--panel2); color:var(--text); font-size:13px; line-height:1.25; }
+/* Landing: jerarquía de producto y hero más compacto. */
+.landing-home {
+  width: min(1120px, 90vw);
+  margin: 0 auto;
+  padding: 40px 0 80px;
+}
+.landing-hero { max-width: 820px; margin: 0 auto; text-align: center; }
+.landing-hero .pill { margin-bottom: 18px; }
+.landing-hero h1 { margin: 0 auto 18px; max-width: 820px; font-size: clamp(42px, 6vw, 72px); line-height: 1.02; }
+.landing-hero .lead { max-width: 700px; margin: 0 auto; font-size: 18px; line-height: 1.55; }
+.landing-primary-cta { margin-top: 28px; padding: 13px 20px; }
+.landing-actions { margin-top: 42px; }
+.landing-action-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 16px; }
+.landing-action-card { width: 100%; text-align: left; cursor: pointer; transition: border-color .18s ease, transform .18s ease; }
+.landing-action-card:hover { border-color: rgba(255,255,255,.28); transform: translateY(-2px); }
+.landing-action-card h3 { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.landing-action-card h3 span { opacity: .55; font-size: 20px; }
+.landing-history-card { margin-top: 48px; }
+.landing-history-header { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
+.landing-history-header h2 { margin: 8px 0 0; }
+.landing-history-content { margin-top: 24px; }
+.landing-empty-state { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 28px 20px 12px; }
+.landing-empty-icon { font-size: 28px; margin-bottom: 10px; opacity: .8; }
+.landing-empty-state h3 { margin: 0 0 8px; font-size: 18px; }
+.landing-empty-state p { max-width: 420px; margin: 0 0 18px; color: var(--muted); line-height: 1.5; }
 @media(max-width:760px) {
-  .retro-principles { grid-template-columns:1fr; }
-}
-
-/* Reordenamiento visual de temas en común */
-.topic-sortable { transition: transform .16s ease, border-color .16s ease, opacity .16s ease; }
-.topic-sortable[draggable="true"] { cursor: grab; }
-.topic-sortable[draggable="true"]:active { cursor: grabbing; }
-.topic-drag-handle { display:inline-flex; align-items:center; justify-content:center; width:28px; color:var(--muted); font-size:18px; letter-spacing:-4px; user-select:none; }
-.topic-dragging { opacity:.45; transform:scale(.99); }
-.topic-drag-over { border-color:#fff !important; transform:translateY(-2px); }
-.topic-move-btn { width:30px; height:30px; border-radius:8px; cursor:pointer; background:transparent; border:1px solid rgba(255,255,255,.14); color:inherit; }
-.topic-move-btn:hover { border-color:rgba(255,255,255,.4); }
-@media(max-width:760px) {
-  .topic-move-btn { width:32px; height:32px; }
-  .topic-drag-handle { display:none; }
-}
-
-
-/* Estado de autosave: reserva espacio para evitar saltos de layout mientras se escribe. */
-.answer-autosave-row {
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  gap:12px;
-  min-height:34px;
-  flex-wrap:wrap;
-}
-.answer-autosave-status {
-  display:flex;
-  align-items:center;
-  min-height:20px;
-  font-size:13px;
-  opacity:.72;
-  line-height:20px;
-}
-@media(max-width:760px) {
-  .answer-autosave-row { align-items:flex-start; }
+  .landing-home { width: min(92vw, 680px); padding-top: 32px; }
+  .landing-action-grid { grid-template-columns: 1fr; }
+  .landing-hero h1 { font-size: clamp(40px, 11vw, 58px); }
+  .landing-history-card { margin-top: 40px; }
 }

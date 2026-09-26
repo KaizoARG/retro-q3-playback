@@ -2261,6 +2261,9 @@ function render() {
     return;
   }
 
+  const toolFeedbackBtn = document.querySelector("#toolFeedbackBtn");
+  if (toolFeedbackBtn) toolFeedbackBtn.style.display = "none";
+
   if (state.retroFinishedAt && state.step === steps.length - 1 && state.showFeedback) {
     stepLabel.textContent = "Feedback";
     progressBar.style.width = "100%";
@@ -3460,6 +3463,99 @@ let landingRetros = [];
 let landingView = "home";
 let landingSelectedRetro = null;
 
+// =====================================================
+// FEEDBACK DE LA HERRAMIENTA
+// =====================================================
+
+function closeToolFeedbackModal() {
+  const modal = document.querySelector("#toolFeedbackModal");
+  if (!modal) return;
+  modal.classList.remove("is-open");
+  modal.setAttribute("aria-hidden", "true");
+}
+
+function openToolFeedbackModal() {
+  const modal = document.querySelector("#toolFeedbackModal");
+  const input = document.querySelector("#toolFeedbackInput");
+  const status = document.querySelector("#toolFeedbackStatus");
+  if (!modal) return;
+  modal.classList.add("is-open");
+  modal.setAttribute("aria-hidden", "false");
+  if (status) {
+    status.classList.remove("is-visible");
+    status.textContent = "";
+  }
+  if (input) {
+    input.value = "";
+    input.focus();
+    const counter = document.querySelector("#toolFeedbackCounter");
+    if (counter) counter.textContent = "0 / 2000";
+  }
+}
+
+function bindToolFeedback() {
+  const openBtn = document.querySelector("#toolFeedbackBtn");
+  const closeBtn = document.querySelector("#toolFeedbackCloseBtn");
+  const submitBtn = document.querySelector("#toolFeedbackSubmitBtn");
+  const input = document.querySelector("#toolFeedbackInput");
+  const counter = document.querySelector("#toolFeedbackCounter");
+
+  if (openBtn) openBtn.onclick = openToolFeedbackModal;
+  if (closeBtn) closeBtn.onclick = closeToolFeedbackModal;
+  document.querySelectorAll("[data-tool-feedback-close]").forEach(el => {
+    el.onclick = closeToolFeedbackModal;
+  });
+
+  if (input && counter) {
+    input.oninput = () => {
+      counter.textContent = `${input.value.length} / 2000`;
+    };
+  }
+
+  if (submitBtn) {
+    submitBtn.onclick = async () => {
+      const feedback = String(input?.value || "").trim();
+      const status = document.querySelector("#toolFeedbackStatus");
+      if (!feedback) {
+        if (status) {
+          status.textContent = "Escribí una sugerencia antes de enviarla.";
+          status.classList.add("is-visible");
+        }
+        input?.focus();
+        return;
+      }
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Enviando…";
+
+      const { error } = await supabaseClient.rpc("submit_tool_feedback", {
+        p_feedback: feedback
+      });
+
+      if (error) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Enviar feedback →";
+        if (status) {
+          status.textContent = "No se pudo guardar el feedback.\n\n" + error.message;
+          status.classList.add("is-visible");
+        }
+        return;
+      }
+
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Enviar feedback →";
+      if (status) {
+        status.textContent = "¡Gracias! Tu feedback fue enviado.";
+        status.classList.add("is-visible");
+      }
+      if (input) input.value = "";
+      if (counter) counter.textContent = "0 / 2000";
+      setTimeout(closeToolFeedbackModal, 900);
+    };
+  }
+}
+
+
 function todayLocalISO() {
   const d = new Date();
   const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
@@ -3488,7 +3584,7 @@ function landingShell(content) {
       ${landingView === "home" ? `
         <nav class="landing-nav">
           <button id="landingHistoryNavBtn" class="ghost landing-nav-btn">Ver retros</button>
-          <button id="landingNewRetroNavBtn" class="primary landing-nav-btn">+ Nueva retro</button>
+          <button id="landingNewRetroNavBtn" class="primary landing-nav-btn">Crear retro</button>
         </nav>
       ` : ""}
     `;
@@ -3498,6 +3594,8 @@ function landingShell(content) {
   if (progressBar) progressBar.style.width = "0%";
   if (backBtn) { backBtn.style.display = "none"; backBtn.disabled = true; }
   if (nextBtn) nextBtn.style.display = "none";
+  const toolFeedbackBtn = document.querySelector("#toolFeedbackBtn");
+  if (toolFeedbackBtn) toolFeedbackBtn.style.display = "inline-flex";
   if (app) app.innerHTML = content;
 }
 
@@ -3548,17 +3646,21 @@ function landingHome() {
 function landingRetroRow(retro) {
   const teams = escapeHtml(retro.equipos || retro.nombre || "Equipos no definidos");
   const date = escapeHtml(formatLandingDate(retro.fecha));
-  const status = retro.finalizada_en ? "Finalizada" : "En preparación";
+  const finished = Boolean(retro.finalizada_en);
+  const started = Boolean(retro.iniciada);
+  const status = finished ? "Finalizada" : started ? "En curso" : "En preparación";
   return `
     <div style="display:flex;justify-content:space-between;align-items:center;gap:18px;padding:18px 0;border-bottom:1px solid rgba(255,255,255,.08);flex-wrap:wrap">
       <div style="min-width:260px;flex:1">
         <div style="font-size:18px;font-weight:700">${teams} · ${date}</div>
         <div style="opacity:.65;margin-top:5px">${status}</div>
       </div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button class="landing-summary-btn" data-retro-id="${retro.id}" style="padding:9px 13px">Ver resumen</button>
-        <button class="landing-feedback-btn" data-retro-id="${retro.id}" style="padding:9px 13px">Ver feedback</button>
+      <div class="landing-history-actions">
+        <button class="landing-summary-btn ${finished ? "" : "landing-disabled-action"}" data-retro-id="${retro.id}" data-disabled-action="${finished ? "false" : "true"}" ${finished ? "" : "aria-disabled=\"true\""} style="padding:9px 13px">Ver resumen</button>
+        <button class="landing-feedback-btn ${finished ? "" : "landing-disabled-action"}" data-retro-id="${retro.id}" data-disabled-action="${finished ? "false" : "true"}" ${finished ? "" : "aria-disabled=\"true\""} style="padding:9px 13px">Ver feedback</button>
+        ${!finished ? `<button class="landing-join-btn primary" data-retro-code="${escapeHtml(retro.codigo || "")}" style="padding:9px 13px">Unirse a la retro →</button>` : ""}
       </div>
+      ${!finished ? `<div class="landing-disabled-notice" data-disabled-notice="${retro.id}">El resumen y el feedback se van a habilitar una vez que la retrospectiva finalice.</div>` : ""}
     </div>
   `;
 }
@@ -3720,24 +3822,23 @@ function bindLanding() {
 
   document.querySelectorAll(".landing-summary-btn").forEach(btn => {
     btn.onclick = async () => {
+      if (btn.dataset.disabledAction === "true") {
+        const notice = document.querySelector(`[data-disabled-notice="${btn.dataset.retroId}"]`);
+        if (notice) notice.classList.toggle("is-visible");
+        return;
+      }
       btn.disabled = true;
       const { data, error } = await supabaseClient.rpc("get_retro_summary", { p_retro_id: btn.dataset.retroId });
       btn.disabled = false;
       if (error) return alert("No se pudo cargar el resumen.\n\n" + error.message);
-
       const { data: questionAnswers, error: questionAnswersError } = await supabaseClient
         .from("preguntas_guia")
         .select("id, pregunta, respuesta, topic_key, origen, orden, created_at")
         .eq("retro_id", btn.dataset.retroId)
         .order("orden", { ascending: true })
         .order("created_at", { ascending: true });
-
       if (questionAnswersError) return alert("No se pudieron cargar las respuestas de las preguntas.\n\n" + questionAnswersError.message);
-
-      landingSelectedRetro = {
-        ...(data || {}),
-        questions: questionAnswers || []
-      };
+      landingSelectedRetro = { ...(data || {}), questions: questionAnswers || [] };
       landingView = "summary";
       renderLanding();
     };
@@ -3745,6 +3846,11 @@ function bindLanding() {
 
   document.querySelectorAll(".landing-feedback-btn").forEach(btn => {
     btn.onclick = async () => {
+      if (btn.dataset.disabledAction === "true") {
+        const notice = document.querySelector(`[data-disabled-notice="${btn.dataset.retroId}"]`);
+        if (notice) notice.classList.toggle("is-visible");
+        return;
+      }
       btn.disabled = true;
       const { data, error } = await supabaseClient.rpc("get_retro_feedback_summary", { p_retro_id: btn.dataset.retroId });
       btn.disabled = false;
@@ -3752,6 +3858,14 @@ function bindLanding() {
       landingSelectedRetro = data;
       landingView = "feedback";
       renderLanding();
+    };
+  });
+
+  document.querySelectorAll(".landing-join-btn").forEach(btn => {
+    btn.onclick = () => {
+      const code = String(btn.dataset.retroCode || "").trim();
+      if (!code) return alert("No se encontró el código de la retrospectiva.");
+      window.location.href = `?retro=${encodeURIComponent(code)}`;
     };
   });
 
@@ -3768,87 +3882,6 @@ function bindLanding() {
     }
     window.location.href = `?retro=${encodeURIComponent(data.codigo)}`;
   };
-}
-
-
-// =====================================================
-// FEEDBACK DE LA HERRAMIENTA
-// =====================================================
-
-function closeToolFeedbackModal() {
-  const modal = document.querySelector("#toolFeedbackModal");
-  if (!modal) return;
-  modal.classList.remove("is-open");
-  modal.setAttribute("aria-hidden", "true");
-}
-
-function openToolFeedbackModal() {
-  const modal = document.querySelector("#toolFeedbackModal");
-  const textarea = document.querySelector("#toolFeedbackText");
-  const status = document.querySelector("#toolFeedbackStatus");
-  if (!modal) return;
-  if (textarea) textarea.value = "";
-  if (status) status.textContent = "";
-  modal.classList.add("is-open");
-  modal.setAttribute("aria-hidden", "false");
-  setTimeout(() => textarea?.focus(), 0);
-}
-
-function bindToolFeedback() {
-  const openBtn = document.querySelector("#toolFeedbackBtn");
-  const closeBtn = document.querySelector("#toolFeedbackClose");
-  const modal = document.querySelector("#toolFeedbackModal");
-  const submitBtn = document.querySelector("#toolFeedbackSubmit");
-  const textarea = document.querySelector("#toolFeedbackText");
-
-  if (openBtn) openBtn.onclick = openToolFeedbackModal;
-  if (closeBtn) closeBtn.onclick = closeToolFeedbackModal;
-
-  if (modal) {
-    modal.onclick = event => {
-      if (event.target === modal) closeToolFeedbackModal();
-    };
-  }
-
-  if (submitBtn) {
-    submitBtn.onclick = async () => {
-      const feedback = String(textarea?.value || "").trim();
-      const status = document.querySelector("#toolFeedbackStatus");
-
-      if (!feedback) {
-        if (status) status.textContent = "Escribí una sugerencia antes de enviar.";
-        textarea?.focus();
-        return;
-      }
-
-      submitBtn.disabled = true;
-      submitBtn.textContent = "Enviando…";
-      if (status) status.textContent = "";
-
-      const { error } = await supabaseClient.rpc("submit_tool_feedback", {
-        p_feedback: feedback
-      });
-
-      if (error) {
-        console.error("Error guardando feedback de herramienta:", error);
-        submitBtn.disabled = false;
-        submitBtn.textContent = "Enviar feedback →";
-        if (status) status.textContent = "No pudimos guardar tu feedback. Intentá nuevamente.";
-        return;
-      }
-
-      submitBtn.disabled = false;
-      submitBtn.textContent = "Enviar feedback →";
-      if (status) status.textContent = "¡Gracias! Feedback enviado.";
-      if (textarea) textarea.value = "";
-
-      setTimeout(closeToolFeedbackModal, 900);
-    };
-  }
-
-  document.addEventListener("keydown", event => {
-    if (event.key === "Escape") closeToolFeedbackModal();
-  });
 }
 
 
@@ -3893,14 +3926,34 @@ function adminPanelView() {
         ${adminRetros.length ? adminRetros.map(adminRetroRow).join("") : `<p style="opacity:.65;margin:0">No hay retrospectivas registradas.</p>`}
       </div>
 
-      <div class="card admin-feedback-card">
-        <div class="eyebrow">FEEDBACK DE LA HERRAMIENTA</div>
-        <h2 style="margin-top:.5rem">Sugerencias recibidas</h2>
-        ${adminToolFeedback.length
-          ? adminToolFeedback.map(adminToolFeedbackRow).join("")
-          : `<p style="opacity:.65;margin:0">Todavía no hay sugerencias recibidas.</p>`}
+      <div class="card" style="margin-top:24px">
+        <div class="admin-feedback-toolbar">
+          <div>
+            <h2 style="font-size:1.75rem;margin:0">Feedback de la APP</h2>
+            <p style="margin:.5rem 0 0;color:var(--muted)">Sugerencias recibidas desde el footer de la herramienta.</p>
+          </div>
+          ${adminToolFeedback.length ? `<button id="adminDeleteAllFeedbackBtn" class="admin-delete-all-feedback-btn">Borrar todas</button>` : ""}
+        </div>
+        <div class="admin-feedback-list">
+          ${adminToolFeedback.length ? adminToolFeedback.map(adminToolFeedbackRow).join("") : `<p style="opacity:.65;margin:1rem 0 0">Todavía no hay sugerencias recibidas.</p>`}
+        </div>
       </div>
     </section>
+  `;
+}
+
+function adminToolFeedbackRow(item) {
+  const id = escapeHtml(item.id);
+  const text = escapeHtml(item.feedback || "");
+  const date = item.created_at ? new Date(item.created_at).toLocaleString("es-AR") : "";
+  return `
+    <div class="admin-feedback-row">
+      <div class="admin-feedback-content">
+        <div>${text}</div>
+        ${date ? `<div class="admin-feedback-date">${escapeHtml(date)}</div>` : ""}
+      </div>
+      <button type="button" class="admin-delete-feedback-btn" data-feedback-id="${id}">Borrar</button>
+    </div>
   `;
 }
 
@@ -3927,28 +3980,16 @@ function adminRetroRow(retro) {
   `;
 }
 
-function adminToolFeedbackRow(item) {
-  const date = item.created_at
-    ? new Date(item.created_at).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" })
-    : "Fecha no disponible";
-  return `
-    <div class="admin-feedback-item">
-      <div class="admin-feedback-meta">${escapeHtml(date)}</div>
-      <div class="admin-feedback-text">${escapeHtml(item.feedback || "")}</div>
-    </div>
-  `;
+async function loadAdminRetros() {
+  const { data, error } = await supabaseClient.rpc("get_admin_retro_history");
+  if (error) throw error;
+  adminRetros = data || [];
 }
 
 async function loadAdminToolFeedback() {
   const { data, error } = await supabaseClient.rpc("get_admin_tool_feedback");
   if (error) throw error;
   adminToolFeedback = data || [];
-}
-
-async function loadAdminRetros() {
-  const { data, error } = await supabaseClient.rpc("get_admin_retro_history");
-  if (error) throw error;
-  adminRetros = data || [];
 }
 
 async function renderAdmin() {
@@ -4039,6 +4080,39 @@ function bindAdminPanel() {
       await renderAdmin();
     };
   });
+
+  document.querySelectorAll(".admin-delete-feedback-btn").forEach(btn => {
+    btn.onclick = async () => {
+      if (!confirm("¿Borrar esta sugerencia? Esta acción no se puede deshacer.")) return;
+      btn.disabled = true;
+      btn.textContent = "Borrando…";
+      const { error } = await supabaseClient.rpc("delete_tool_feedback", {
+        p_feedback_id: btn.dataset.feedbackId
+      });
+      if (error) {
+        btn.disabled = false;
+        btn.textContent = "Borrar";
+        return alert("No se pudo borrar la sugerencia.\n\n" + error.message);
+      }
+      await renderAdmin();
+    };
+  });
+
+  const deleteAllFeedbackBtn = document.querySelector("#adminDeleteAllFeedbackBtn");
+  if (deleteAllFeedbackBtn) {
+    deleteAllFeedbackBtn.onclick = async () => {
+      if (!confirm("Vas a borrar todas las sugerencias de la APP. Esta acción no se puede deshacer.\n\n¿Querés continuar?")) return;
+      deleteAllFeedbackBtn.disabled = true;
+      deleteAllFeedbackBtn.textContent = "Borrando…";
+      const { error } = await supabaseClient.rpc("delete_all_tool_feedback");
+      if (error) {
+        deleteAllFeedbackBtn.disabled = false;
+        deleteAllFeedbackBtn.textContent = "Borrar todas";
+        return alert("No se pudo borrar el feedback.\n\n" + error.message);
+      }
+      await renderAdmin();
+    };
+  }
 }
 
 async function initializeAdmin() {

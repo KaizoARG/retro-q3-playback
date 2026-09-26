@@ -56,7 +56,7 @@ const state = {
   // Retro actual
   retroId: null,
 
-  // Preguntas guía de la conversación
+  // Preguntas de la conversación
   guidingQuestions: [],
 
   // Acciones
@@ -487,7 +487,7 @@ const steps = [
   "Actividad",
   "Agrupación",
   "Votación",
-  "Preguntas guía",
+  "Preguntas",
   "Acciones",
   "Cierre"
 ];
@@ -1392,6 +1392,37 @@ async function advanceRetro() {
     return;
   }
 
+  // La etapa de Preguntas requiere que todas las preguntas registradas
+  // tengan una respuesta guardada antes de poder continuar.
+  if (state.step === 5) {
+    const { data: validationData, error: validationError } = await supabaseClient.rpc(
+      "validate_guiding_questions_answered",
+      { p_retro_id: state.retroId }
+    );
+
+    if (validationError) {
+      console.error("No se pudo validar las respuestas de las preguntas:", validationError);
+      alert("No se pudo verificar si todas las preguntas tienen respuesta.\n\n" + validationError.message);
+      return;
+    }
+
+    if (!validationData?.all_answered) {
+      await loadGuidingQuestions();
+      const stillUnanswered = state.guidingQuestions.filter(question => !String(question.answer || "").trim());
+      alert(
+        stillUnanswered.length === 1
+          ? "Hay una pregunta sin respuesta. Respondela y guardá la respuesta antes de continuar."
+          : `Hay ${stillUnanswered.length} preguntas sin respuesta. Respondelas y guardá las respuestas antes de continuar.`
+      );
+      const firstUnanswered = stillUnanswered[0];
+      if (firstUnanswered) {
+        const input = document.querySelector(`#questionAnswer-${firstUnanswered.id}`);
+        if (input) input.focus();
+      }
+      return;
+    }
+  }
+
 
   const {
     data,
@@ -1444,7 +1475,7 @@ async function advanceRetro() {
   }
 
   // Si solo existe un tema en común, no tiene sentido pasar por votación.
-  // Avanzamos una etapa adicional para llegar directamente a Preguntas guía.
+  // Avanzamos una etapa adicional para llegar directamente a Preguntas.
   if (state.step === 4 && shouldSkipVotingStep()) {
     const { data: skippedData, error: skippedError } = await supabaseClient
       .rpc(
@@ -1559,7 +1590,7 @@ async function previousRetroStep() {
   }
 
   // Si la retro tiene un solo tema, la etapa 4 (Votación) se omite también
-  // al volver hacia atrás: desde Preguntas guía volvemos directamente a Agrupación.
+  // al volver hacia atrás: desde Preguntas volvemos directamente a Agrupación.
   if (state.step === 4 && shouldSkipVotingStep()) {
     const { data: skippedData, error: skippedError } = await supabaseClient
       .rpc(
@@ -2829,7 +2860,7 @@ const screens = [
 
 
   // ===================================================
-  // 6. PREGUNTAS GUÍA
+  // 6. PREGUNTAS
   // ===================================================
 
   () => {
@@ -2843,7 +2874,7 @@ const screens = [
       <section>
 
         <div class="eyebrow">
-          Preguntas guía
+          Preguntas
         </div>
 
         <h2>
@@ -2853,7 +2884,7 @@ const screens = [
         <p class="lead">
           Este es el tema que recibió más votos.
           Ahora el objetivo es hacernos preguntas que nos ayuden a entender
-          qué hay detrás y abrir el camino hacia acciones de mejora.
+          qué hay detrás y responderlas para abrir el camino hacia acciones de mejora.
         </p>
 
         ${
@@ -2887,10 +2918,10 @@ const screens = [
                   y de las situaciones que aparecieron en la actividad.
                 </p>
                 <button class="primary" id="generateQuestionsBtn" style="margin-top:12px">
-                  Generar preguntas guía
+                  Generar preguntas
                 </button>
                 <button type="button" id="clearAllGuidingQuestionsBtn" ${questions.length ? "" : "disabled"}
-                  style="margin-top:10px;padding:10px 14px;border-radius:10px;border:1px solid rgba(255,255,255,.14);background:${questions.length ? "transparent" : "rgba(255,255,255,.05)"};color:${questions.length ? "inherit" : "rgba(255,255,255,.35)"};cursor:${questions.length ? "pointer" : "not-allowed"};opacity:${questions.length ? "1" : ".65"};" title="Borrar todas las preguntas guía">
+                  style="margin-top:10px;padding:10px 14px;border-radius:10px;border:1px solid rgba(255,255,255,.14);background:${questions.length ? "transparent" : "rgba(255,255,255,.05)"};color:${questions.length ? "inherit" : "rgba(255,255,255,.35)"};cursor:${questions.length ? "pointer" : "not-allowed"};opacity:${questions.length ? "1" : ".65"};" title="Borrar todas las preguntas">
                   🗑️ Borrar todas las preguntas
                 </button>
               </div>
@@ -2908,43 +2939,66 @@ const screens = [
         <div class="card" style="margin-top:28px">
           <h3>Preguntas del equipo</h3>
           <p>
-            No buscamos responderlas ahora. Buscamos preguntas que nos ayuden
-            a descubrir dónde podemos intervenir para mejorar.
+            Cada pregunta necesita una respuesta. Las respuestas quedan guardadas
+            y serán parte del resumen final de la retrospectiva.
           </p>
 
           <div style="display:grid;gap:12px;margin-top:18px">
             ${
               questions.length
                 ? questions.map((question, index) => `
-                    <div
-                      class="topic"
-                      style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;">
-                      <div style="display:flex;gap:12px;min-width:0;">
-                        <strong>${index + 1}.</strong>
-                        <span>${escapeHtml(question.text)}</span>
+                    <div class="topic" style="display:grid;gap:14px;">
+                      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;">
+                        <div style="display:flex;gap:12px;min-width:0;">
+                          <strong>${index + 1}.</strong>
+                          <span>${escapeHtml(question.text)}</span>
+                        </div>
+                        ${
+                          isFacilitator
+                            ? `
+                              <div style="display:flex;gap:8px;flex-shrink:0;">
+                                <button
+                                  type="button"
+                                  class="edit-guiding-question"
+                                  data-question-id="${escapeHtml(question.id)}"
+                                  title="Modificar pregunta"
+                                  aria-label="Modificar pregunta"
+                                  style="width:34px;height:34px;border-radius:9px;cursor:pointer;background:transparent;border:1px solid rgba(255,255,255,.14);color:inherit;">✏️</button>
+                                <button
+                                  type="button"
+                                  class="delete-guiding-question"
+                                  data-question-id="${escapeHtml(question.id)}"
+                                  title="Eliminar pregunta"
+                                  aria-label="Eliminar pregunta"
+                                  style="width:34px;height:34px;border-radius:9px;cursor:pointer;background:transparent;border:1px solid rgba(255,255,255,.14);color:inherit;">🗑️</button>
+                              </div>
+                            `
+                            : ""
+                        }
                       </div>
-                      ${
-                        isFacilitator
-                          ? `
-                            <div style="display:flex;gap:8px;flex-shrink:0;">
-                              <button
-                                type="button"
-                                class="edit-guiding-question"
-                                data-question-id="${escapeHtml(question.id)}"
-                                title="Modificar pregunta"
-                                aria-label="Modificar pregunta"
-                                style="width:34px;height:34px;border-radius:9px;cursor:pointer;background:transparent;border:1px solid rgba(255,255,255,.14);color:inherit;">✏️</button>
-                              <button
-                                type="button"
-                                class="delete-guiding-question"
-                                data-question-id="${escapeHtml(question.id)}"
-                                title="Eliminar pregunta"
-                                aria-label="Eliminar pregunta"
-                                style="width:34px;height:34px;border-radius:9px;cursor:pointer;background:transparent;border:1px solid rgba(255,255,255,.14);color:inherit;">🗑️</button>
-                            </div>
-                          `
-                          : ""
-                      }
+
+                      <div style="display:grid;gap:8px;">
+                        <label for="questionAnswer-${escapeHtml(question.id)}" class="badge">RESPUESTA · OBLIGATORIA</label>
+                        <textarea
+                          id="questionAnswer-${escapeHtml(question.id)}"
+                          class="guiding-question-answer"
+                          data-question-id="${escapeHtml(question.id)}"
+                          rows="4"
+                          required
+                          aria-required="true"
+                          placeholder="Escriban la respuesta a esta pregunta..."
+                          style="width:100%;resize:vertical;">${escapeHtml(question.answer || "")}</textarea>
+                        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+                          <span style="font-size:13px;opacity:.62;">La respuesta debe estar guardada para poder continuar.</span>
+                          <button
+                            type="button"
+                            class="save-guiding-question-answer"
+                            data-question-id="${escapeHtml(question.id)}"
+                            style="padding:9px 13px;">
+                            Guardar respuesta
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   `).join("")
                 : `
@@ -2995,9 +3049,9 @@ const screens = [
       </p>
 
       <div class="card" style="margin-top:24px">
-        <div class="badge">PREGUNTAS GUÍA</div>
+        <div class="badge">PREGUNTAS</div>
         <p style="margin-top:10px">
-          Estas son las preguntas que nos hicimos en la instancia anterior.
+          Estas son las preguntas que respondimos en la instancia anterior.
           Usémoslas como punto de partida para definir acciones de mejora.
         </p>
 
@@ -3008,14 +3062,17 @@ const screens = [
                 ${state.guidingQuestions.map((question, index) => `
                   <div class="topic" style="display:flex;align-items:flex-start;gap:12px">
                     <strong>${index + 1}.</strong>
-                    <span>${escapeHtml(question.text)}</span>
+                    <div style="display:grid;gap:5px;min-width:0">
+                      <span>${escapeHtml(question.text)}</span>
+                      <span style="opacity:.72">Respuesta: ${escapeHtml(question.answer || "Sin respuesta")}</span>
+                    </div>
                   </div>
                 `).join("")}
               </div>
             `
             : `
               <div class="badge" style="margin-top:16px">
-                No se registraron preguntas guía en la instancia anterior.
+                No se registraron preguntas en la instancia anterior.
               </div>
             `
         }
@@ -3196,14 +3253,17 @@ const screens = [
             ? `<div style="display:grid;gap:10px;margin-top:18px">
                 ${mainTopicQuestions.map((question, index) => `
                   <div class="topic" style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
-                    <div style="display:flex;gap:12px;min-width:0"><strong>${index + 1}.</strong><span>${escapeHtml(question.text)}</span></div>
+                    <div style="display:grid;gap:7px;min-width:0">
+                        <div style="display:flex;gap:12px;min-width:0"><strong>${index + 1}.</strong><span>${escapeHtml(question.text)}</span></div>
+                        <div style="margin-left:28px;opacity:.78"><strong>Respuesta:</strong> ${escapeHtml(question.answer || "Sin respuesta")}</div>
+                      </div>
                     ${state.isFacilitator ? `<div style="display:flex;gap:6px;flex-shrink:0">
                       <button type="button" class="summary-edit-question" data-question-id="${escapeHtml(question.id)}" title="Modificar pregunta">✏️</button>
                       <button type="button" class="summary-delete-question" data-question-id="${escapeHtml(question.id)}" title="Eliminar pregunta">🗑️</button>
                     </div>` : ""}
                   </div>`).join("")}
               </div>`
-            : `<div class="badge" style="margin-top:16px">No se registraron preguntas guía.</div>`}
+            : `<div class="badge" style="margin-top:16px">No se registraron preguntas.</div>`}
         </div>
 
         <div class="card" style="margin-top:18px">
@@ -3395,7 +3455,7 @@ function landingSummaryView(summary) {
       </div>
 
       <div class="grid" style="margin-top:20px">
-        <div class="card"><div class="eyebrow">Preguntas</div>${questions.length ? `<ul>${questions.map(q=>`<li style="margin:10px 0">${escapeHtml(q.pregunta || q.text || "")}</li>`).join("")}</ul>` : `<p style="opacity:.65">No se registraron preguntas.</p>`}</div>
+        <div class="card"><div class="eyebrow">Preguntas</div>${questions.length ? `<div style="display:grid;gap:14px;margin-top:12px">${questions.map((q,index)=>`<div style="padding-bottom:12px;border-bottom:1px solid rgba(255,255,255,.08)"><div><strong>${index + 1}.</strong> ${escapeHtml(q.pregunta || q.text || "")}</div><div style="margin-top:7px;opacity:.78"><strong>Respuesta:</strong> ${escapeHtml(q.respuesta || q.answer || "Sin respuesta")}</div></div>`).join("")}</div>` : `<p style="opacity:.65">No se registraron preguntas.</p>`}</div>
         <div class="card">
           <div class="eyebrow">Acciones acordadas</div>
           ${actions.length ? `<div style="margin-top:4px">${actions.map(renderAction).join("")}</div>` : `<p style="opacity:.65">No se registraron acciones.</p>`}
@@ -3466,7 +3526,20 @@ function bindLanding() {
       const { data, error } = await supabaseClient.rpc("get_retro_summary", { p_retro_id: btn.dataset.retroId });
       btn.disabled = false;
       if (error) return alert("No se pudo cargar el resumen.\n\n" + error.message);
-      landingSelectedRetro = data;
+
+      const { data: questionAnswers, error: questionAnswersError } = await supabaseClient
+        .from("preguntas_guia")
+        .select("id, pregunta, respuesta, topic_key, origen, orden, created_at")
+        .eq("retro_id", btn.dataset.retroId)
+        .order("orden", { ascending: true })
+        .order("created_at", { ascending: true });
+
+      if (questionAnswersError) return alert("No se pudieron cargar las respuestas de las preguntas.\n\n" + questionAnswersError.message);
+
+      landingSelectedRetro = {
+        ...(data || {}),
+        questions: questionAnswers || []
+      };
       landingView = "summary";
       renderLanding();
     };
@@ -3792,20 +3865,20 @@ async function loadTopics() {
 
 
 // =====================================================
-// CARGAR PREGUNTAS GUÍA
+// CARGAR PREGUNTAS
 // =====================================================
 
 async function loadGuidingQuestions() {
 
   const { data, error } = await supabaseClient
     .from("preguntas_guia")
-    .select("id, retro_id, topic_key, pregunta, origen, autor_session_id, orden, created_at")
+    .select("id, retro_id, topic_key, pregunta, respuesta, origen, autor_session_id, orden, created_at")
     .eq("retro_id", state.retroId)
     .order("orden", { ascending: true })
     .order("created_at", { ascending: true });
 
   if (error) {
-    console.error("Error cargando preguntas guía:", error);
+    console.error("Error cargando preguntas:", error);
     state.guidingQuestions = [];
     return;
   }
@@ -3814,12 +3887,13 @@ async function loadGuidingQuestions() {
     id: question.id,
     topicKey: question.topic_key,
     text: question.pregunta,
+    answer: question.respuesta || "",
     origin: question.origen,
     authorSessionId: question.autor_session_id,
     order: question.orden
   }));
 
-  console.log("Preguntas guía cargadas:", state.guidingQuestions);
+  console.log("Preguntas cargadas:", state.guidingQuestions);
 }
 
 
@@ -4229,7 +4303,7 @@ function subscribeToVotes() {
 
 
 // =====================================================
-// REALTIME - PREGUNTAS GUÍA
+// REALTIME - PREGUNTAS
 // =====================================================
 
 function subscribeToGuidingQuestions() {
@@ -4245,7 +4319,7 @@ function subscribeToGuidingQuestions() {
         filter: `retro_id=eq.${state.retroId}`
       },
       async payload => {
-        console.log("Cambio de preguntas guía recibido:", payload);
+        console.log("Cambio de preguntas recibido:", payload);
         await loadGuidingQuestions();
 
         if (state.step === 5 || state.step === 6 || state.step === 7) {
@@ -4254,7 +4328,7 @@ function subscribeToGuidingQuestions() {
       }
     )
     .subscribe(status => {
-      console.log("Realtime preguntas guía:", status);
+      console.log("Realtime preguntas:", status);
     });
 }
 
@@ -4452,7 +4526,7 @@ async function bind() {
   const summaryAddQuestion = document.querySelector(".summary-add-question");
   if (summaryAddQuestion) summaryAddQuestion.onclick = async () => {
     if (!state.isFacilitator) return;
-    const value = prompt("Nueva pregunta guía:");
+    const value = prompt("Nueva pregunta:");
     const clean = String(value || "").trim();
     if (!clean) return;
     if (questionExists(clean)) return alert("Esa pregunta ya fue agregada.");
@@ -4469,7 +4543,7 @@ async function bind() {
     button.onclick = async () => {
       const q = state.guidingQuestions.find(item => item.id === button.dataset.questionId);
       if (!q || !state.isFacilitator) return;
-      const value = prompt("Modificar pregunta guía:", q.text);
+      const value = prompt("Modificar pregunta:", q.text);
       const clean = String(value || "").trim();
       if (!clean || clean === q.text) return;
       const { data, error } = await supabaseClient.rpc("update_guiding_question", {
@@ -4477,6 +4551,11 @@ async function bind() {
         p_question_id: q.id, p_pregunta: clean
       });
       if (error || !data?.success) return alert("No se pudo modificar la pregunta.\n\n" + (error?.message || data?.message || "Error"));
+      const { error: answerResetError } = await supabaseClient.rpc("save_guiding_question_answer", {
+        p_retro_id: state.retroId, p_session_id: state.participantSessionId,
+        p_question_id: q.id, p_respuesta: ""
+      });
+      if (answerResetError) return alert("La pregunta se modificó, pero no se pudo reiniciar su respuesta.\n\n" + answerResetError.message);
       await loadGuidingQuestions(); render();
     };
   });
@@ -5477,7 +5556,7 @@ async function bind() {
     });
 
   // ===================================================
-  // PREGUNTAS GUÍA
+  // PREGUNTAS
   // ===================================================
 
   const generateQuestionsBtn =
@@ -5486,7 +5565,7 @@ async function bind() {
   if (generateQuestionsBtn) {
     generateQuestionsBtn.onclick = async () => {
       if (!state.isFacilitator) {
-        alert("Solo el facilitador puede generar las preguntas guía.");
+        alert("Solo el facilitador puede generar las preguntas.");
         return;
       }
 
@@ -5510,7 +5589,7 @@ async function bind() {
       if (!questionsToGenerate.length) {
         alert(
           automaticQuestions.length >= 3
-            ? "Ya se generaron las 3 preguntas guía automáticas permitidas.\n\nPodés modificarlas o agregar preguntas manualmente."
+            ? "Ya se generaron las 3 preguntas automáticas permitidas.\n\nPodés modificarlas o agregar preguntas manualmente."
             : "Las preguntas sugeridas ya estaban cargadas."
         );
         return;
@@ -5536,7 +5615,7 @@ async function bind() {
 
           if (error) throw error;
           if (!data?.success) {
-            throw new Error(data?.message || "No se pudo crear la pregunta guía.");
+            throw new Error(data?.message || "No se pudo crear la pregunta.");
           }
           added += 1;
         }
@@ -5550,10 +5629,10 @@ async function bind() {
             : "Las preguntas sugeridas ya estaban cargadas."
         );
       } catch (error) {
-        console.error("Error generando preguntas guía:", error);
-        alert("No se pudieron generar las preguntas guía.\n\n" + error.message);
+        console.error("Error generando preguntas:", error);
+        alert("No se pudieron generar las preguntas.\n\n" + error.message);
         generateQuestionsBtn.disabled = false;
-        generateQuestionsBtn.textContent = "Generar preguntas guía";
+        generateQuestionsBtn.textContent = "Generar preguntas";
       }
     };
   }
@@ -5563,16 +5642,16 @@ async function bind() {
   if (clearAllGuidingQuestionsBtn) {
     clearAllGuidingQuestionsBtn.onclick = async () => {
       if (!state.isFacilitator || !state.guidingQuestions.length) return;
-      if (!confirm("¿Borrar todas las preguntas guía?\n\nSe eliminarán las preguntas automáticas y manuales.")) return;
+      if (!confirm("¿Borrar todas las preguntas?\n\nSe eliminarán las preguntas automáticas y manuales.")) return;
       clearAllGuidingQuestionsBtn.disabled = true; clearAllGuidingQuestionsBtn.textContent = "Borrando…";
       try {
         const { data, error } = await supabaseClient.rpc("clear_all_guiding_questions", { p_retro_id: state.retroId, p_session_id: state.participantSessionId });
         if (error) throw error;
-        if (!data?.success) throw new Error(data?.message || "No se pudieron borrar las preguntas guía.");
+        if (!data?.success) throw new Error(data?.message || "No se pudieron borrar las preguntas.");
         await loadGuidingQuestions(); render();
       } catch (error) {
-        console.error("Error borrando todas las preguntas guía:", error);
-        alert("No se pudieron borrar las preguntas guía.\n\n" + error.message);
+        console.error("Error borrando todas las preguntas:", error);
+        alert("No se pudieron borrar las preguntas.\n\n" + error.message);
         clearAllGuidingQuestionsBtn.disabled = false; clearAllGuidingQuestionsBtn.textContent = "🗑️ Borrar todas las preguntas";
       }
     };
@@ -5623,13 +5702,53 @@ async function bind() {
         await loadGuidingQuestions();
         render();
       } catch (error) {
-        console.error("Error agregando pregunta guía:", error);
+        console.error("Error agregando pregunta:", error);
         alert("No se pudo agregar la pregunta.\n\n" + error.message);
         addGuidingQuestionBtn.disabled = false;
         addGuidingQuestionBtn.textContent = "+ Agregar pregunta";
       }
     };
   }
+
+  document.querySelectorAll(".save-guiding-question-answer").forEach(button => {
+    button.onclick = async () => {
+      const questionId = button.dataset.questionId;
+      const input = document.querySelector(`#questionAnswer-${questionId}`);
+      const answer = input ? input.value.trim() : "";
+
+      if (!answer) {
+        alert("Escribí una respuesta antes de guardarla.");
+        if (input) input.focus();
+        return;
+      }
+
+      button.disabled = true;
+      const originalText = button.textContent;
+      button.textContent = "Guardando…";
+
+      try {
+        const { data, error } = await supabaseClient.rpc("save_guiding_question_answer", {
+          p_retro_id: state.retroId,
+          p_session_id: state.participantSessionId,
+          p_question_id: questionId,
+          p_respuesta: answer
+        });
+
+        if (error) throw error;
+        if (!data?.success) {
+          throw new Error(data?.message || "No se pudo guardar la respuesta.");
+        }
+
+        await loadGuidingQuestions();
+        render();
+      } catch (error) {
+        console.error("Error guardando respuesta:", error);
+        alert("No se pudo guardar la respuesta.\n\n" + error.message);
+        button.disabled = false;
+        button.textContent = originalText;
+      }
+    };
+  });
 
   document
     .querySelectorAll(".edit-guiding-question")
@@ -5641,7 +5760,7 @@ async function bind() {
         const question = state.guidingQuestions.find(item => item.id === questionId);
         if (!question) return;
 
-        const newText = prompt("Modificar pregunta guía:", question.text);
+        const newText = prompt("Modificar pregunta:", question.text);
         const cleanText = String(newText || "").trim();
 
         if (!cleanText || cleanText === question.text) return;
@@ -5671,10 +5790,18 @@ async function bind() {
             throw new Error(data?.message || "No se pudo modificar la pregunta.");
           }
 
+          const { error: answerResetError } = await supabaseClient.rpc("save_guiding_question_answer", {
+            p_retro_id: state.retroId,
+            p_session_id: state.participantSessionId,
+            p_question_id: questionId,
+            p_respuesta: ""
+          });
+          if (answerResetError) throw answerResetError;
+
           await loadGuidingQuestions();
           render();
         } catch (error) {
-          console.error("Error modificando pregunta guía:", error);
+          console.error("Error modificando pregunta:", error);
           alert("No se pudo modificar la pregunta.\n\n" + error.message);
         }
       };
@@ -5711,7 +5838,7 @@ async function bind() {
           await loadGuidingQuestions();
           render();
         } catch (error) {
-          console.error("Error eliminando pregunta guía:", error);
+          console.error("Error eliminando pregunta:", error);
           alert("No se pudo eliminar la pregunta.\n\n" + error.message);
         }
       };
@@ -5992,6 +6119,8 @@ async function initialize() {
   await loadTopics();
 
   await loadGuidingQuestions();
+
+  state.step = normalizeStepForTopics(state.step);
 
   await loadActions();
 

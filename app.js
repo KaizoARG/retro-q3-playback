@@ -2178,36 +2178,33 @@ const screens = [
       </div>
 
       <h1>
-        Hagamos visible<br>
-        lo que aprendimos.
+        Llevemos adelante la retro teniendo en cuenta...
       </h1>
 
       <p class="lead">
-        Una retro guiada para transformar experiencias del trimestre
-        en aprendizajes, conversaciones y acciones concretas.
+        Independientemente de los resultados, partimos de la base de que cada quien dio su máximo con las herramientas y el contexto que tenía.
       </p>
 
-      <div class="grid">
+      <div class="retro-principles">
 
-        <div class="card">
-          <h3>01 · Actividad</h3>
-          <p>
-            Traemos hechos, aprendizajes y fricciones.
-          </p>
+        <div class="principle-card">
+          <h3>Valores Scrum</h3>
+          <div class="capsules">
+            <span class="capsule">Enfoque</span>
+            <span class="capsule">Apertura</span>
+            <span class="capsule">Respeto</span>
+            <span class="capsule">Compromiso</span>
+            <span class="capsule">Valentía</span>
+          </div>
         </div>
 
-        <div class="card">
-          <h3>02 · Conversar</h3>
-          <p>
-            Elegimos dónde poner energía como equipo.
-          </p>
-        </div>
-
-        <div class="card">
-          <h3>03 · Accionar</h3>
-          <p>
-            Convertimos la conversación en compromisos.
-          </p>
+        <div class="principle-card">
+          <h3>Principios Kanban</h3>
+          <div class="capsules">
+            <span class="capsule">Empezá donde estés</span>
+            <span class="capsule">Establecé cambios evolutivos</span>
+            <span class="capsule">Promové el liderazgo en todos los niveles</span>
+          </div>
         </div>
 
       </div>
@@ -3060,12 +3057,11 @@ const screens = [
 
         <div class="card" style="margin-top:28px;display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap">
           <div>
-            <div class="badge">TIEMPO TOTAL DE LA ACTIVIDAD</div>
-            <div style="font-size:30px;font-weight:700;margin-top:8px">
-              ${escapeHtml(formatDuration(state.retroStartedAt, state.retroFinishedAt))}
+            <div style="font-size:22px;font-weight:700">
+              Duración total: ${escapeHtml(formatDuration(state.retroStartedAt, state.retroFinishedAt))}
             </div>
             <div class="badge" style="margin-top:6px">
-              Desde el inicio de la retro hasta llegar al cierre.
+              Tiempo transcurrido desde el inicio de la retro hasta su finalización.
             </div>
           </div>
         </div>
@@ -5687,13 +5683,6 @@ async function bind() {
           .value
         || null;
 
-      const successCriteria =
-        document
-          .querySelector("#actionWhy")
-          .value
-          .trim()
-        || null;
-
 
       add.disabled = true;
 
@@ -5707,7 +5696,6 @@ async function bind() {
           descripcion: text,
           responsable: owner,
           fecha: date,
-          criterio_exito: successCriteria,
           retro_id: state.retroId
         })
         .select()
@@ -5756,11 +5744,7 @@ async function bind() {
 
         date:
           data.fecha ||
-          "Por definir",
-
-        successCriteria:
-          data.criterio_exito ||
-          ""
+          "Por definir"
 
       };
 

@@ -146,3 +146,86 @@ textarea { min-height:6.25rem; resize:vertical; }
     font-size:.8125rem;
   }
 }
+
+
+/* Feedback de la herramienta */
+.footer-feedback-btn {
+  border:0;
+  padding:.8125rem 1rem;
+  border-radius:.75rem;
+  cursor:pointer;
+  background:transparent;
+  color:#b8bdc7;
+  font-size:.8125rem;
+  font-weight:600;
+  transition:.18s ease;
+}
+.footer-feedback-btn:hover { color:#fff; background:#171922; }
+
+.tool-feedback-modal {
+  display:none;
+  position:fixed;
+  inset:0;
+  z-index:10000;
+  align-items:center;
+  justify-content:center;
+  padding:1.25rem;
+  background:rgba(0,0,0,.72);
+  backdrop-filter:blur(.5rem);
+}
+.tool-feedback-modal.is-open { display:flex; }
+.tool-feedback-dialog {
+  position:relative;
+  width:min(42rem,100%);
+  padding:2rem;
+  border:.0625rem solid var(--line);
+  border-radius:1.125rem;
+  background:var(--panel);
+  box-shadow:0 1.25rem 5rem rgba(0,0,0,.45);
+}
+.tool-feedback-close {
+  position:absolute;
+  top:.75rem;
+  right:.75rem;
+  width:2.25rem;
+  height:2.25rem;
+  border:.0625rem solid var(--line);
+  border-radius:.625rem;
+  background:transparent;
+  color:var(--muted);
+  cursor:pointer;
+  font-size:1.5rem;
+  line-height:1;
+}
+.tool-feedback-close:hover { color:#fff; }
+.tool-feedback-dialog h2 { margin-top:.5rem; }
+.tool-feedback-textarea {
+  min-height:9.375rem;
+  margin-top:1.5rem;
+  resize:vertical;
+}
+.tool-feedback-footer {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:1rem;
+  margin-top:1rem;
+}
+.tool-feedback-status { color:var(--muted); font-size:.8125rem; min-height:1.2em; }
+
+.admin-feedback-card { margin-top:2rem; }
+.admin-feedback-item {
+  padding:1rem 0;
+  border-bottom:.0625rem solid rgba(255,255,255,.08);
+}
+.admin-feedback-item:last-child { border-bottom:0; }
+.admin-feedback-meta { color:var(--muted); font-size:.75rem; margin-bottom:.5rem; }
+.admin-feedback-text { line-height:1.55; white-space:pre-wrap; }
+
+@media(max-width:47.5rem) {
+  .footer { gap:.35rem; }
+  .footer-feedback-btn { padding:.625rem .5rem; font-size:.6875rem; white-space:nowrap; }
+  .tool-feedback-dialog { padding:1.5rem; }
+  .tool-feedback-footer { align-items:stretch; flex-direction:column; }
+  .tool-feedback-footer .primary { width:100%; }
+}

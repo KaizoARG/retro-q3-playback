@@ -12,6 +12,7 @@ button,input,textarea { font:inherit; }
 .topbar { height:72px; display:flex; align-items:center; gap:28px; padding:0 5vw; border-bottom:1px solid var(--line); }
 .brand { font-weight:800; letter-spacing:.12em; }
 .brand-dot { display:inline-block; width:9px; height:9px; border-radius:50%; background:white; margin-right:8px; }
+.session { color:var(--muted); font-size:12px; letter-spacing:.1em; }
 .progress { margin-left:auto; width:180px; height:4px; background:#20232b; border-radius:99px; overflow:hidden; }
 .progress span { display:block; height:100%; width:12.5%; background:white; transition:.35s; }
 main { width:min(1120px,90vw); margin:auto; padding:70px 0 110px; flex:1; }
@@ -67,4 +68,18 @@ textarea { min-height:100px; resize:vertical; }
 .capsule { display:inline-flex; align-items:center; min-height:34px; padding:7px 13px; border:1px solid var(--line); border-radius:999px; background:var(--panel2); color:var(--text); font-size:13px; line-height:1.25; }
 @media(max-width:760px) {
   .retro-principles { grid-template-columns:1fr; }
+}
+
+/* Reordenamiento visual de temas en común */
+.topic-sortable { transition: transform .16s ease, border-color .16s ease, opacity .16s ease; }
+.topic-sortable[draggable="true"] { cursor: grab; }
+.topic-sortable[draggable="true"]:active { cursor: grabbing; }
+.topic-drag-handle { display:inline-flex; align-items:center; justify-content:center; width:28px; color:var(--muted); font-size:18px; letter-spacing:-4px; user-select:none; }
+.topic-dragging { opacity:.45; transform:scale(.99); }
+.topic-drag-over { border-color:#fff !important; transform:translateY(-2px); }
+.topic-move-btn { width:30px; height:30px; border-radius:8px; cursor:pointer; background:transparent; border:1px solid rgba(255,255,255,.14); color:inherit; }
+.topic-move-btn:hover { border-color:rgba(255,255,255,.4); }
+@media(max-width:760px) {
+  .topic-move-btn { width:32px; height:32px; }
+  .topic-drag-handle { display:none; }
 }

@@ -3548,39 +3548,16 @@ function landingHome() {
 function landingRetroRow(retro) {
   const teams = escapeHtml(retro.equipos || retro.nombre || "Equipos no definidos");
   const date = escapeHtml(formatLandingDate(retro.fecha));
-  const isFinished = Boolean(retro.finalizada_en);
-  const status = isFinished ? "Finalizada" : "En curso";
-  const lockedStyle = "padding:9px 13px;opacity:.42;cursor:pointer";
-  const activeStyle = "padding:9px 13px";
-
+  const status = retro.finalizada_en ? "Finalizada" : "En preparación";
   return `
     <div style="display:flex;justify-content:space-between;align-items:center;gap:18px;padding:18px 0;border-bottom:1px solid rgba(255,255,255,.08);flex-wrap:wrap">
       <div style="min-width:260px;flex:1">
         <div style="font-size:18px;font-weight:700">${teams} · ${date}</div>
         <div style="opacity:.65;margin-top:5px">${status}</div>
       </div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-        <button
-          class="landing-summary-btn"
-          data-retro-id="${retro.id}"
-          data-retro-finished="${isFinished}"
-          aria-disabled="${!isFinished}"
-          style="${isFinished ? activeStyle : lockedStyle}"
-        >Ver resumen</button>
-        <button
-          class="landing-feedback-btn"
-          data-retro-id="${retro.id}"
-          data-retro-finished="${isFinished}"
-          aria-disabled="${!isFinished}"
-          style="${isFinished ? activeStyle : lockedStyle}"
-        >Ver feedback</button>
-        ${!isFinished ? `
-          <button
-            class="landing-join-btn primary"
-            data-retro-id="${retro.id}"
-            style="padding:9px 13px"
-          >Unirse a la retro →</button>
-        ` : ""}
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="landing-summary-btn" data-retro-id="${retro.id}" style="padding:9px 13px">Ver resumen</button>
+        <button class="landing-feedback-btn" data-retro-id="${retro.id}" style="padding:9px 13px">Ver feedback</button>
       </div>
     </div>
   `;
@@ -3741,29 +3718,8 @@ function bindLanding() {
   const back = document.querySelector("#landingBackBtn");
   if (back) back.onclick = async () => { landingView = "home"; await loadLandingRetros(); renderLanding(); };
 
-  const showLandingLockedMessage = (btn) => {
-    const row = btn.closest("div[style*='border-bottom']");
-    if (!row) return;
-
-    const existing = row.querySelector(".landing-locked-message");
-    if (existing) {
-      existing.remove();
-    }
-
-    const message = document.createElement("div");
-    message.className = "landing-locked-message";
-    message.style.cssText = "width:100%;font-size:13px;line-height:1.4;opacity:.7;margin-top:4px;";
-    message.textContent = "El resumen y el feedback se van a habilitar una vez que finalice la retrospectiva.";
-    row.querySelector("div[style*='align-items:center']")?.appendChild(message);
-  };
-
   document.querySelectorAll(".landing-summary-btn").forEach(btn => {
     btn.onclick = async () => {
-      if (btn.dataset.retroFinished !== "true") {
-        showLandingLockedMessage(btn);
-        return;
-      }
-
       btn.disabled = true;
       const { data, error } = await supabaseClient.rpc("get_retro_summary", { p_retro_id: btn.dataset.retroId });
       btn.disabled = false;
@@ -3789,11 +3745,6 @@ function bindLanding() {
 
   document.querySelectorAll(".landing-feedback-btn").forEach(btn => {
     btn.onclick = async () => {
-      if (btn.dataset.retroFinished !== "true") {
-        showLandingLockedMessage(btn);
-        return;
-      }
-
       btn.disabled = true;
       const { data, error } = await supabaseClient.rpc("get_retro_feedback_summary", { p_retro_id: btn.dataset.retroId });
       btn.disabled = false;
@@ -3801,33 +3752,6 @@ function bindLanding() {
       landingSelectedRetro = data;
       landingView = "feedback";
       renderLanding();
-    };
-  });
-
-  document.querySelectorAll(".landing-join-btn").forEach(btn => {
-    btn.onclick = async () => {
-      btn.disabled = true;
-      btn.textContent = "Abriendo…";
-
-      const { data, error } = await supabaseClient
-        .from("retros")
-        .select("codigo, finalizada_en")
-        .eq("id", btn.dataset.retroId)
-        .single();
-
-      if (error || !data?.codigo) {
-        btn.disabled = false;
-        btn.textContent = "Unirse a la retro →";
-        return alert("No se pudo abrir la retrospectiva.\n\n" + (error?.message || "No se encontró el código de la retro."));
-      }
-
-      if (data.finalizada_en) {
-        await loadLandingRetros();
-        renderLanding();
-        return;
-      }
-
-      window.location.href = `?retro=${encodeURIComponent(data.codigo)}`;
     };
   });
 

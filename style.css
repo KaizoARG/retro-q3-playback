@@ -57,7 +57,7 @@ textarea { min-height:6.25rem; resize:vertical; }
 .summary { display:grid; grid-template-columns:1fr 1fr; gap:1.125rem; margin-top:2.375rem; }
 @media(max-width:47.5rem) {
   .topbar { gap:0.75rem; padding:0 1.25rem; } .session { display:none; } .progress { width:5.625rem; }
-  main { width:90vw; padding-top:2.8125rem; } .grid,.columns,.summary,.action-form { grid-template-columns:1fr; }
+  main { width:90vw; padding-top:0.8125rem; } .grid,.columns,.summary,.action-form { grid-template-columns:1fr; }
   h1 { font-size:3rem; } .footer { padding:0 1.25rem; }
 }
 
@@ -75,13 +75,13 @@ textarea { min-height:6.25rem; resize:vertical; }
 .landing-hero { max-width: 51.25rem; margin: 0; text-align: left; }
 .landing-hero h1 { margin: 0 0 1.125rem; max-width: 51.25rem; font-size: clamp(2.625rem, 6vw, 4.5rem); line-height: 1.02; }
 .landing-hero .lead { max-width: 43.75rem; margin: 0; font-size: 1.125rem; line-height: 1.55; }
-.landing-actions { margin-top: 2.625rem; }
+.landing-actions { margin-top: 2rem; }
 .landing-action-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin-top: 1rem; }
 .landing-action-card { width: 100%; text-align: left; cursor: pointer; transition: border-color .18s ease, transform .18s ease; }
 .landing-action-card:hover { border-color: rgba(255,255,255,.28); transform: translateY(-0.125rem); }
 .landing-action-card h3 { display: flex; align-items: center; justify-content: space-between; gap: 1rem; color: #fff; }
 .landing-action-card h3 span { opacity: .55; font-size: 1.25rem; }
-.landing-history-card { margin-top: 3rem; }
+.landing-history-card { margin-top: 1rem; }
 .landing-history-header { display: flex; justify-content: space-between; align-items: flex-end; gap: 1rem; flex-wrap: wrap; }
 .landing-history-header h2 { margin: 0.5rem 0 0; }
 .landing-history-content { margin-top: 1.5rem; }

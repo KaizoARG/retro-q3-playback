@@ -375,7 +375,7 @@ function getDynamicTopics() {
 
 
 function shouldSkipVotingStep() {
-  return getDynamicTopics().length === 1;
+  return getDynamicTopics().length <= 1;
 }
 
 function normalizeStepForTopics(step) {
@@ -1591,7 +1591,7 @@ async function advanceRetro() {
 
   }
 
-  // Si solo existe un tema en común, no tiene sentido pasar por votación.
+  // Si existe uno o ningún tema en común, no tiene sentido pasar por votación.
   // Avanzamos una etapa adicional para llegar directamente a Preguntas.
   if (state.step === 4 && shouldSkipVotingStep()) {
     const { data: skippedData, error: skippedError } = await supabaseClient
@@ -1706,7 +1706,7 @@ async function previousRetroStep() {
 
   }
 
-  // Si la retro tiene un solo tema, la etapa 4 (Votación) se omite también
+  // Si la retro tiene uno o ningún tema, la etapa 4 (Votación) se omite también
   // al volver hacia atrás: desde Preguntas volvemos directamente a Agrupación.
   if (state.step === 4 && shouldSkipVotingStep()) {
     const { data: skippedData, error: skippedError } = await supabaseClient

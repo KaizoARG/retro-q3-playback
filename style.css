@@ -89,33 +89,22 @@ textarea { min-height:6.25rem; resize:vertical; }
 .landing-empty-icon { font-size: 1.75rem; margin-bottom: 0.625rem; opacity: .8; }
 .landing-empty-state h3 { margin: 0 0 0.5rem; font-size: 1.125rem; }
 .landing-empty-state p { max-width: 26.25rem; margin: 0 0 1.125rem; color: var(--muted); line-height: 1.5; }
-/* Landing: acciones bloqueadas durante retros en curso. */
-.landing-disabled-action {
-  opacity: .42;
-  cursor: not-allowed !important;
-  border-color: rgba(255,255,255,.10) !important;
-  transform: none !important;
-}
-.landing-disabled-action:hover {
-  border-color: rgba(255,255,255,.10) !important;
-  transform: none !important;
-}
-.landing-disabled-notice {
-  display: none;
-  margin-top: .75rem;
-  padding: .75rem .875rem;
-  border-radius: .625rem;
-  background: rgba(255,255,255,.04);
-  color: var(--muted);
-  font-size: .875rem;
-  line-height: 1.45;
-}
-.landing-disabled-notice.is-visible { display: block; }
+.landing-history-actions { display:flex; gap:.5rem; flex-wrap:wrap; align-items:center; }
 
 @media(max-width:47.5rem) {
   .landing-home { width: min(92vw, 42.5rem); padding-top: 1.125rem; }
   .landing-action-grid { grid-template-columns: 1fr; }
   .landing-hero h1 { font-size: clamp(2.5rem, 11vw, 3.625rem); }
-
   .landing-history-card { margin-top: 2.5rem; }
+  .landing-nav { gap:.4rem; }
+  .landing-nav-btn { padding:.5rem .625rem; font-size:.75rem; white-space:nowrap; }
+  .landing-history-actions { width:100%; gap:.375rem; }
+  .landing-history-actions button {
+    flex:1 1 0;
+    min-width:0;
+    padding:.5625rem .5rem !important;
+    font-size:.75rem;
+    line-height:1.2;
+    white-space:nowrap;
+  }
 }

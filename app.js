@@ -3316,16 +3316,6 @@ const screens = [
       ? (state.guidingQuestions || []).filter(q => !q.topicKey || q.topicKey === topTopic.key)
       : (state.guidingQuestions || []);
 
-    const formatDuration = (start, end) => {
-      if (!start || !end) return "Tiempo total no disponible todavía";
-      const ms = Math.max(0, new Date(end).getTime() - new Date(start).getTime());
-      const totalSeconds = Math.floor(ms / 1000);
-      const hours = Math.floor(totalSeconds / 3600);
-      const minutes = Math.floor((totalSeconds % 3600) / 60);
-      const seconds = totalSeconds % 60;
-      return `${hours} h ${minutes} min ${seconds} s`;
-    };
-
     return `
       <section>
         <div class="eyebrow">Cierre</div>
@@ -3338,17 +3328,6 @@ const screens = [
           El facilitador puede ajustar cualquier elemento para que el resultado final
           represente lo que el equipo acuerda.
         </p>
-
-        <div class="card" style="margin-top:28px;display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap">
-          <div>
-            <div style="font-size:22px;font-weight:700">
-              Duración total: ${escapeHtml(formatDuration(state.retroStartedAt, state.retroFinishedAt))}
-            </div>
-            <div class="badge" style="margin-top:6px">
-              Tiempo transcurrido desde el inicio de la retro hasta su finalización.
-            </div>
-          </div>
-        </div>
 
         <div class="card" style="margin-top:18px">
           <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">

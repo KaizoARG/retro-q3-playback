@@ -18,9 +18,24 @@
 
     <footer class="footer">
       <button id="backBtn" class="ghost">← Atrás</button>
+      <button id="toolFeedbackBtn" class="footer-feedback-btn" type="button">Suma tu feedback!</button>
       <div id="stepLabel">1 / 8</div>
       <button id="nextBtn" class="primary">Comenzar →</button>
     </footer>
+
+    <div id="toolFeedbackModal" class="tool-feedback-modal" aria-hidden="true">
+      <div class="tool-feedback-dialog" role="dialog" aria-modal="true" aria-labelledby="toolFeedbackTitle">
+        <button id="toolFeedbackClose" class="tool-feedback-close" type="button" aria-label="Cerrar">×</button>
+        <div class="eyebrow">FEEDBACK DE LA HERRAMIENTA</div>
+        <h2 id="toolFeedbackTitle">¿Qué mejorarías?</h2>
+        <p class="lead">Contanos qué cambiarías, qué te resultó difícil o qué funcionalidad te gustaría sumar.</p>
+        <textarea id="toolFeedbackText" class="tool-feedback-textarea" maxlength="2000" placeholder="Escribí tu sugerencia…"></textarea>
+        <div class="tool-feedback-footer">
+          <span id="toolFeedbackStatus" class="tool-feedback-status"></span>
+          <button id="toolFeedbackSubmit" class="primary" type="button">Enviar feedback →</button>
+        </div>
+      </div>
+    </div>
   </div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="app.js"></script>

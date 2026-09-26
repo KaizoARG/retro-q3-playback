@@ -2984,19 +2984,51 @@ const screens = [
                           class="guiding-question-answer"
                           data-question-id="${escapeHtml(question.id)}"
                           rows="4"
+                          ${question.answer ? "disabled" : ""}
                           required
                           aria-required="true"
                           placeholder="Escriban la respuesta a esta pregunta..."
                           style="width:100%;resize:vertical;">${escapeHtml(question.answer || "")}</textarea>
                         <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
                           <span style="font-size:13px;opacity:.62;">La respuesta debe estar guardada para poder continuar.</span>
-                          <button
-                            type="button"
-                            class="save-guiding-question-answer"
-                            data-question-id="${escapeHtml(question.id)}"
-                            style="padding:9px 13px;">
-                            Guardar respuesta
-                          </button>
+                          <div style="display:flex;align-items:center;gap:8px;">
+                            ${
+                              question.answer
+                                ? `
+                                  <button
+                                    type="button"
+                                    class="save-guiding-question-answer answer-saved"
+                                    data-question-id="${escapeHtml(question.id)}"
+                                    disabled
+                                    style="padding:9px 13px;opacity:.8;cursor:default;">
+                                    Respuesta guardada
+                                  </button>
+                                  <button
+                                    type="button"
+                                    class="edit-guiding-question-answer"
+                                    data-question-id="${escapeHtml(question.id)}"
+                                    title="Modificar respuesta"
+                                    aria-label="Modificar respuesta"
+                                    style="width:34px;height:34px;border-radius:9px;cursor:pointer;background:transparent;border:1px solid rgba(255,255,255,.14);color:inherit;">✏️</button>
+                                  <button
+                                    type="button"
+                                    class="delete-guiding-question-answer"
+                                    data-question-id="${escapeHtml(question.id)}"
+                                    title="Eliminar respuesta"
+                                    aria-label="Eliminar respuesta"
+                                    style="width:34px;height:34px;border-radius:9px;cursor:pointer;background:transparent;border:1px solid rgba(255,255,255,.14);color:inherit;">🗑️</button>
+                                `
+                                : `
+                                  <button
+                                    type="button"
+                                    class="save-guiding-question-answer"
+                                    data-question-id="${escapeHtml(question.id)}"
+                                    style="padding:9px 13px;">
+                                    Guardar respuesta
+                                  </button>
+                                `
+                            }
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -5746,6 +5778,96 @@ async function bind() {
         alert("No se pudo guardar la respuesta.\n\n" + error.message);
         button.disabled = false;
         button.textContent = originalText;
+      }
+    };
+  });
+
+  document.querySelectorAll(".edit-guiding-question-answer").forEach(button => {
+    button.onclick = () => {
+      const questionId = button.dataset.questionId;
+      const input = document.querySelector(`#questionAnswer-${questionId}`);
+      if (!input) return;
+
+      input.disabled = false;
+      input.focus();
+      input.setSelectionRange(input.value.length, input.value.length);
+
+      const container = button.closest(".topic");
+      if (!container) return;
+
+      const actions = container.querySelector(".save-guiding-question-answer")?.parentElement;
+      if (!actions) return;
+
+      actions.innerHTML = `
+        <button
+          type="button"
+          class="save-guiding-question-answer"
+          data-question-id="${escapeHtml(questionId)}"
+          style="padding:9px 13px;">
+          Guardar respuesta
+        </button>
+      `;
+
+      const saveButton = actions.querySelector(".save-guiding-question-answer");
+      if (saveButton) {
+        saveButton.onclick = async () => {
+          const answer = input.value.trim();
+          if (!answer) {
+            alert("Escribí una respuesta antes de guardarla.");
+            input.focus();
+            return;
+          }
+
+          saveButton.disabled = true;
+          saveButton.textContent = "Guardando…";
+          try {
+            const { data, error } = await supabaseClient.rpc("save_guiding_question_answer", {
+              p_retro_id: state.retroId,
+              p_session_id: state.participantSessionId,
+              p_question_id: questionId,
+              p_respuesta: answer
+            });
+            if (error) throw error;
+            if (!data?.success) throw new Error(data?.message || "No se pudo guardar la respuesta.");
+            await loadGuidingQuestions();
+            render();
+          } catch (error) {
+            console.error("Error guardando respuesta:", error);
+            alert("No se pudo guardar la respuesta.\n\n" + error.message);
+            saveButton.disabled = false;
+            saveButton.textContent = "Guardar respuesta";
+          }
+        };
+      }
+
+      container.querySelectorAll(".edit-guiding-question-answer, .delete-guiding-question-answer").forEach(el => el.remove());
+    };
+  });
+
+  document.querySelectorAll(".delete-guiding-question-answer").forEach(button => {
+    button.onclick = async () => {
+      const questionId = button.dataset.questionId;
+      const question = state.guidingQuestions.find(item => item.id === questionId);
+      if (!question || !question.answer) return;
+
+      if (!confirm("¿Eliminar la respuesta de esta pregunta?")) return;
+
+      button.disabled = true;
+      try {
+        const { data, error } = await supabaseClient.rpc("save_guiding_question_answer", {
+          p_retro_id: state.retroId,
+          p_session_id: state.participantSessionId,
+          p_question_id: questionId,
+          p_respuesta: ""
+        });
+        if (error) throw error;
+        if (!data?.success) throw new Error(data?.message || "No se pudo eliminar la respuesta.");
+        await loadGuidingQuestions();
+        render();
+      } catch (error) {
+        console.error("Error eliminando respuesta:", error);
+        alert("No se pudo eliminar la respuesta.\n\n" + error.message);
+        button.disabled = false;
       }
     };
   });

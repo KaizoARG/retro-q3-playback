@@ -2174,7 +2174,7 @@ const screens = [
     <section class="hero">
 
       <div class="pill">
-        RETRO · Q3 2026
+        Tengamos siempre presentes estos fundamentos.
       </div>
 
       <h1>

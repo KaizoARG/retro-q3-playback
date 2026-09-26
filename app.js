@@ -3503,33 +3503,46 @@ function landingShell(content) {
 
 function landingHome() {
   return `
-    <section style="max-width:1120px;margin:0 auto;padding:56px 20px 80px">
-      <div style="max-width:780px">
+    <section class="landing-home">
+      <div class="landing-hero">
         <div class="pill">ASISTENTE DE RETROSPECTIVAS</div>
-        <h1 style="font-size:clamp(42px,6vw,72px);line-height:1.02;margin:22px 0 18px">
+        <h1>
           Tu espacio para reflexionar, aprender y mejorar en equipo
         </h1>
-        <p class="lead" style="font-size:20px;line-height:1.6">
+        <p class="lead">
           Bienvenido a tu asistente de retrospectivas. Un lugar donde vas a poder consultar las retros anteriores, ver resúmenes y facilitar nuevas sesiones en minutos de la forma más sencilla posible.
         </p>
+        <button id="heroNewRetroBtn" class="primary landing-primary-cta">+ Crear nueva retro</button>
       </div>
 
-      <div style="margin-top:52px">
+      <div class="landing-actions">
         <div class="eyebrow">¿Qué podés hacer?</div>
-        <div class="grid" style="margin-top:18px">
-          <div class="card"><h3>📊 Explorar el historial</h3><p>Revisá las retros de los distintos equipos y descubrí patrones de mejora.</p></div>
-          <div class="card"><h3>💡 Consultar resúmenes y acuerdos</h3><p>Accedé rápido a los puntos clave y compromisos tomados en sesiones anteriores.</p></div>
-          <div class="card"><h3>🚀 Crear una nueva retro</h3><p>No pierdas tiempo en Miro: desde acá lo resolvemos.</p></div>
+        <div class="landing-action-grid">
+          <button type="button" class="card landing-action-card" id="landingExploreHistoryBtn">
+            <h3>📊 Explorar el historial <span>→</span></h3>
+            <p>Revisá las retros de los distintos equipos y descubrí patrones de mejora.</p>
+          </button>
+          <button type="button" class="card landing-action-card" id="landingExploreSummaryBtn">
+            <h3>💡 Revisar aprendizajes y acuerdos <span>→</span></h3>
+            <p>Volvé sobre los puntos clave y compromisos tomados en sesiones anteriores.</p>
+          </button>
         </div>
       </div>
 
-      <div id="landingHistorySection" style="margin-top:58px" class="card">
-        <div style="display:flex;justify-content:space-between;align-items:end;gap:16px;flex-wrap:wrap">
-          <div><div class="eyebrow">Historial</div><h2 style="margin:8px 0 0">Retrospectivas anteriores</h2></div>
+      <div id="landingHistorySection" class="card landing-history-card">
+        <div class="landing-history-header">
+          <div><div class="eyebrow">Historial</div><h2>Retrospectivas anteriores</h2></div>
           <button id="newRetroBtn" class="primary" style="padding:12px 18px">+ Crear nueva retro</button>
         </div>
-        <div id="landingHistory" style="margin-top:24px">
-          ${landingRetros.length ? landingRetros.map(landingRetroRow).join("") : `<p style="opacity:.65;margin:0">Todavía no hay retrospectivas cargadas.</p>`}
+        <div id="landingHistory" class="landing-history-content">
+          ${landingRetros.length ? landingRetros.map(landingRetroRow).join("") : `
+            <div class="landing-empty-state">
+              <div class="landing-empty-icon">📋</div>
+              <h3>Todavía no hay retros</h3>
+              <p>Cuando finalices una retrospectiva, va a aparecer acá automáticamente.</p>
+              <button id="landingEmptyNewRetroBtn" class="ghost">+ Crear primera retro</button>
+            </div>
+          `}
         </div>
       </div>
     </section>
@@ -3694,6 +3707,22 @@ function bindLanding() {
       renderLanding();
     };
   }
+
+  const heroNewRetroBtn = document.querySelector("#heroNewRetroBtn");
+  if (heroNewRetroBtn) heroNewRetroBtn.onclick = () => { landingView = "create"; renderLanding(); };
+
+  const exploreHistoryBtn = document.querySelector("#landingExploreHistoryBtn");
+  const exploreSummaryBtn = document.querySelector("#landingExploreSummaryBtn");
+  const emptyNewRetroBtn = document.querySelector("#landingEmptyNewRetroBtn");
+
+  const scrollToLandingHistory = () => {
+    const historySection = document.querySelector("#landingHistorySection");
+    if (historySection) historySection.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  if (exploreHistoryBtn) exploreHistoryBtn.onclick = scrollToLandingHistory;
+  if (exploreSummaryBtn) exploreSummaryBtn.onclick = scrollToLandingHistory;
+  if (emptyNewRetroBtn) emptyNewRetroBtn.onclick = () => { landingView = "create"; renderLanding(); };
 
   const back = document.querySelector("#landingBackBtn");
   if (back) back.onclick = async () => { landingView = "home"; await loadLandingRetros(); renderLanding(); };

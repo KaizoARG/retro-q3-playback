@@ -3540,6 +3540,7 @@ function landingHome() {
             </div>
           `}
         </div>
+        <div id="landingDisabledNotice" class="landing-disabled-notice" role="status" aria-live="polite"></div>
       </div>
     </section>
   `;
@@ -3569,7 +3570,6 @@ function landingRetroRow(retro) {
           ${joinButton}
         </div>
       </div>
-      <div id="landingNotice-${retro.id}" class="landing-disabled-notice" role="status" aria-live="polite"></div>
     </div>
   `;
 }
@@ -3729,19 +3729,19 @@ function bindLanding() {
   const back = document.querySelector("#landingBackBtn");
   if (back) back.onclick = async () => { landingView = "home"; await loadLandingRetros(); renderLanding(); };
 
-  const showLandingDisabledNotice = (retroId) => {
-    const notice = document.querySelector(`#landingNotice-${retroId}`);
+  const showLandingDisabledNotice = () => {
+    const notice = document.querySelector("#landingDisabledNotice");
     if (!notice) return;
     notice.textContent = "Esta opción se va a habilitar una vez que finalice la retrospectiva.";
     notice.classList.add("is-visible");
   };
 
-  document.querySelectorAll(".landing-summary-btn").forEach(btn => {
-    btn.onclick = () => showLandingDisabledNotice(btn.dataset.retroId);
+  document.querySelectorAll(".landing-summary-btn.landing-disabled-action").forEach(btn => {
+    btn.onclick = showLandingDisabledNotice;
   });
 
-  document.querySelectorAll(".landing-feedback-btn").forEach(btn => {
-    btn.onclick = () => showLandingDisabledNotice(btn.dataset.retroId);
+  document.querySelectorAll(".landing-feedback-btn.landing-disabled-action").forEach(btn => {
+    btn.onclick = showLandingDisabledNotice;
   });
 
   document.querySelectorAll(".landing-join-btn").forEach(btn => {

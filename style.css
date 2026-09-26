@@ -258,6 +258,19 @@ textarea { min-height:6.25rem; resize:vertical; }
   border-radius:.625rem;
   padding:.5625rem .75rem;
   cursor:pointer;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  flex:0 0 auto;
+}
+.admin-delete-feedback-btn {
+  width:2.5rem;
+  height:2.5rem;
+  padding:0;
+  font-size:1rem;
+}
+.admin-delete-feedback-btn:hover, .admin-delete-all-feedback-btn:hover {
+  background:rgba(255,120,120,.08);
 }
 .admin-delete-all-feedback-btn { padding:.625rem .875rem; }
 @media(max-width:47.5rem) {
@@ -267,5 +280,5 @@ textarea { min-height:6.25rem; resize:vertical; }
   .tool-feedback-actions { flex-direction:column-reverse; }
   .tool-feedback-actions button { width:100%; }
   .admin-feedback-row { flex-direction:column; }
-  .admin-delete-feedback-btn { width:100%; }
+  .admin-delete-feedback-btn { width:2.5rem; }
 }

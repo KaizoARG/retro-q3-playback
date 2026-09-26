@@ -3117,30 +3117,20 @@ const screens = [
                           aria-required="true"
                           placeholder="Escriban la respuesta a esta pregunta..."
                           style="width:100%;resize:vertical;">${escapeHtml(getQuestionAnswerForRender(question))}</textarea>
-                        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
-                          <span class="answer-autosave-status" data-question-id="${escapeHtml(question.id)}" style="font-size:13px;opacity:.62;">
+                        <div class="answer-autosave-row">
+                          <span class="answer-autosave-status" data-question-id="${escapeHtml(question.id)}" aria-live="polite">
                             ${
                               state.answerAutosaveStatus[question.id] === "saving"
-                                ? "Guardando automáticamente…"
+                                ? "Guardando…"
                                 : state.answerAutosaveStatus[question.id] === "error"
-                                  ? "No se pudo guardar automáticamente. Se reintentará al editar."
-                                  : getQuestionAnswerForRender(question)
-                                    ? "Respuesta guardada automáticamente"
-                                    : "La respuesta se guarda automáticamente al escribir."
+                                  ? "No se pudo guardar. Se reintentará al editar."
+                                  : ""
                             }
                           </span>
-                          <div style="display:flex;align-items:center;gap:8px;">
-                            ${
-                              question.answer
-                                ? `
-                                  <button
-                                    type="button"
-                                    class="answer-autosave-indicator"
-                                    data-question-id="${escapeHtml(question.id)}"
-                                    disabled
-                                    style="padding:9px 13px;opacity:.8;cursor:default;">
-                                    ${state.answerAutosaveStatus[question.id] === "saving" ? "Guardando…" : "Respuesta guardada"}
-                                  </button>
+                          ${
+                            question.answer
+                              ? `
+                                <div style="display:flex;align-items:center;gap:8px;">
                                   <button
                                     type="button"
                                     class="edit-guiding-question-answer"
@@ -3155,19 +3145,10 @@ const screens = [
                                     title="Eliminar respuesta"
                                     aria-label="Eliminar respuesta"
                                     style="width:34px;height:34px;border-radius:9px;cursor:pointer;background:transparent;border:1px solid rgba(255,255,255,.14);color:inherit;">🗑️</button>
-                                `
-                                : `
-                                  <button
-                                    type="button"
-                                    class="answer-autosave-indicator"
-                                    data-question-id="${escapeHtml(question.id)}"
-                                    disabled
-                                    style="padding:9px 13px;opacity:.65;cursor:default;">
-                                    ${state.answerAutosaveStatus[question.id] === "saving" ? "Guardando…" : "Autosave activo"}
-                                  </button>
-                                `
-                            }
-                          </div>
+                                </div>
+                              `
+                              : ""
+                          }
                         </div>
                       </div>
                     </div>

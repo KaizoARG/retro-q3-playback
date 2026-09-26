@@ -3479,6 +3479,8 @@ function resetToolFeedbackModal() {
   const status = document.querySelector("#toolFeedbackStatus");
   const counter = document.querySelector("#toolFeedbackCounter");
   const submitBtn = document.querySelector("#toolFeedbackSubmitBtn");
+  const cancelBtn = document.querySelector(".tool-feedback-cancel");
+  const closeBtn = document.querySelector("#toolFeedbackCloseBtn");
   const actions = document.querySelector(".tool-feedback-actions");
   const meta = document.querySelector(".tool-feedback-meta");
   const title = document.querySelector("#toolFeedbackTitle");
@@ -3497,7 +3499,15 @@ function resetToolFeedbackModal() {
   }
   if (meta) meta.hidden = false;
   if (actions) actions.hidden = false;
+  if (closeBtn) closeBtn.hidden = false;
+  if (cancelBtn) {
+    cancelBtn.hidden = false;
+    cancelBtn.textContent = "Cancelar";
+    cancelBtn.classList.remove("primary");
+    cancelBtn.classList.add("ghost");
+  }
   if (submitBtn) {
+    submitBtn.hidden = false;
     submitBtn.disabled = false;
     submitBtn.textContent = "Enviar feedback →";
   }
@@ -3573,17 +3583,27 @@ function bindToolFeedback() {
       const meta = document.querySelector(".tool-feedback-meta");
       const title = document.querySelector("#toolFeedbackTitle");
       const lead = document.querySelector("#toolFeedbackModal .lead");
+      const cancelBtn = document.querySelector(".tool-feedback-cancel");
+      const closeBtn = document.querySelector("#toolFeedbackCloseBtn");
 
       if (input) input.hidden = true;
       if (counter) counter.hidden = true;
       if (meta) meta.hidden = true;
-      if (actions) actions.hidden = true;
       if (dialog) dialog.classList.add("is-confirmation");
+      if (closeBtn) closeBtn.hidden = true;
+      if (actions) actions.hidden = false;
+      if (cancelBtn) {
+        cancelBtn.hidden = false;
+        cancelBtn.textContent = "Volver a la APP";
+        cancelBtn.classList.remove("ghost");
+        cancelBtn.classList.add("primary");
+      }
+      if (submitBtn) submitBtn.hidden = true;
       if (title) title.textContent = "¡Gracias!";
       if (lead) lead.textContent = "Tu feedback fue enviado correctamente.";
       if (status) {
-        status.textContent = "Tu sugerencia fue recibida y ya forma parte del feedback de la APP.";
-        status.classList.add("is-visible");
+        status.textContent = "";
+        status.classList.remove("is-visible");
       }
     };
   }

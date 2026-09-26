@@ -375,7 +375,7 @@ function getDynamicTopics() {
 
 
 function shouldSkipVotingStep() {
-  return getDynamicTopics().length <= 1;
+  return getDynamicTopics().length === 1;
 }
 
 function normalizeStepForTopics(step) {
@@ -1591,7 +1591,7 @@ async function advanceRetro() {
 
   }
 
-  // Si existe uno o ningún tema en común, no tiene sentido pasar por votación.
+  // Si solo existe un tema en común, no tiene sentido pasar por votación.
   // Avanzamos una etapa adicional para llegar directamente a Preguntas.
   if (state.step === 4 && shouldSkipVotingStep()) {
     const { data: skippedData, error: skippedError } = await supabaseClient
@@ -1706,7 +1706,7 @@ async function previousRetroStep() {
 
   }
 
-  // Si la retro tiene uno o ningún tema, la etapa 4 (Votación) se omite también
+  // Si la retro tiene un solo tema, la etapa 4 (Votación) se omite también
   // al volver hacia atrás: desde Preguntas volvemos directamente a Agrupación.
   if (state.step === 4 && shouldSkipVotingStep()) {
     const { data: skippedData, error: skippedError } = await supabaseClient
@@ -3476,23 +3476,10 @@ function formatLandingDate(value) {
 
 function landingShell(content) {
   const app = document.querySelector("#app");
-  const topbar = document.querySelector(".topbar");
   const stepLabel = document.querySelector("#stepLabel");
   const progressBar = document.querySelector("#progressBar");
   const backBtn = document.querySelector("#backBtn");
   const nextBtn = document.querySelector("#nextBtn");
-
-  if (topbar) {
-    topbar.innerHTML = `
-      <div class="brand"><span class="brand-dot"></span> RETROS</div>
-      ${landingView === "home" ? `
-        <nav class="landing-nav">
-          <button id="landingHistoryNavBtn" class="ghost landing-nav-btn">Ver retros</button>
-          <button id="landingNewRetroNavBtn" class="primary landing-nav-btn">+ Nueva retro</button>
-        </nav>
-      ` : ""}
-    `;
-  }
 
   if (stepLabel) stepLabel.textContent = "";
   if (progressBar) progressBar.style.width = "0%";
@@ -3503,42 +3490,33 @@ function landingShell(content) {
 
 function landingHome() {
   return `
-    <section class="landing-home">
-      <div class="landing-hero">
-        <h1>
+    <section style="max-width:1120px;margin:0 auto;padding:56px 20px 80px">
+      <div style="max-width:780px">
+        <div class="pill">ASISTENTE DE RETROSPECTIVAS</div>
+        <h1 style="font-size:clamp(42px,6vw,72px);line-height:1.02;margin:22px 0 18px">
           Tu espacio para reflexionar, aprender y mejorar en equipo
         </h1>
-        <p class="lead">
+        <p class="lead" style="font-size:20px;line-height:1.6">
           Bienvenido a tu asistente de retrospectivas. Un lugar donde vas a poder consultar las retros anteriores, ver resúmenes y facilitar nuevas sesiones en minutos de la forma más sencilla posible.
         </p>
       </div>
 
-      <div class="landing-actions">
+      <div style="margin-top:52px">
         <div class="eyebrow">¿Qué podés hacer?</div>
-        <div class="landing-action-grid">
-          <button type="button" class="card landing-action-card" id="landingExploreHistoryBtn">
-            <h3>📊 Explorar el historial <span>→</span></h3>
-            <p>Revisá las retros de los distintos equipos y descubrí patrones de mejora.</p>
-          </button>
-          <button type="button" class="card landing-action-card" id="landingExploreSummaryBtn">
-            <h3>💡 Revisar aprendizajes y acuerdos <span>→</span></h3>
-            <p>Volvé sobre los puntos clave y compromisos tomados en sesiones anteriores.</p>
-          </button>
+        <div class="grid" style="margin-top:18px">
+          <div class="card"><h3>📊 Explorar el historial</h3><p>Revisá las retros de los distintos equipos y descubrí patrones de mejora.</p></div>
+          <div class="card"><h3>💡 Consultar resúmenes y acuerdos</h3><p>Accedé rápido a los puntos clave y compromisos tomados en sesiones anteriores.</p></div>
+          <div class="card"><h3>🚀 Crear una nueva retro</h3><p>No pierdas tiempo en Miro: desde acá lo resolvemos.</p></div>
         </div>
       </div>
 
-      <div id="landingHistorySection" class="card landing-history-card">
-        <div class="landing-history-header">
-          <h2>Historial de retros</h2>
+      <div style="margin-top:58px" class="card">
+        <div style="display:flex;justify-content:space-between;align-items:end;gap:16px;flex-wrap:wrap">
+          <div><div class="eyebrow">Historial</div><h2 style="margin:8px 0 0">Retrospectivas anteriores</h2></div>
+          <button id="newRetroBtn" class="primary" style="padding:12px 18px">+ Crear nueva retro</button>
         </div>
-        <div id="landingHistory" class="landing-history-content">
-          ${landingRetros.length ? landingRetros.map(landingRetroRow).join("") : `
-            <div class="landing-empty-state">
-              <div class="landing-empty-icon">📋</div>
-              <h3>Todavía no hay retros</h3>
-              <p>Cuando finalices una retrospectiva, va a aparecer acá automáticamente.</p>
-            </div>
-          `}
+        <div id="landingHistory" style="margin-top:24px">
+          ${landingRetros.length ? landingRetros.map(landingRetroRow).join("") : `<p style="opacity:.65;margin:0">Todavía no hay retrospectivas cargadas.</p>`}
         </div>
       </div>
     </section>
@@ -3548,16 +3526,39 @@ function landingHome() {
 function landingRetroRow(retro) {
   const teams = escapeHtml(retro.equipos || retro.nombre || "Equipos no definidos");
   const date = escapeHtml(formatLandingDate(retro.fecha));
-  const status = retro.finalizada_en ? "Finalizada" : "En preparación";
+  const finished = Boolean(retro.finalizada_en);
+  const status = finished ? "Finalizada" : "En curso";
   return `
-    <div style="display:flex;justify-content:space-between;align-items:center;gap:18px;padding:18px 0;border-bottom:1px solid rgba(255,255,255,.08);flex-wrap:wrap">
-      <div style="min-width:260px;flex:1">
-        <div style="font-size:18px;font-weight:700">${teams} · ${date}</div>
-        <div style="opacity:.65;margin-top:5px">${status}</div>
+    <div class="landing-retro-row">
+      <div class="landing-retro-info">
+        <div class="landing-retro-title">${teams} · ${date}</div>
+        <div class="landing-retro-status">${status}</div>
       </div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button class="landing-summary-btn" data-retro-id="${retro.id}" style="padding:9px 13px">Ver resumen</button>
-        <button class="landing-feedback-btn" data-retro-id="${retro.id}" style="padding:9px 13px">Ver feedback</button>
+      <div class="landing-retro-actions">
+        <button
+          class="landing-summary-btn landing-locked-btn"
+          data-retro-id="${retro.id}"
+          aria-disabled="${finished ? "false" : "true"}"
+          ${finished ? "" : "title=\"Disponible al finalizar la retrospectiva\""}
+          style="padding:9px 13px"
+        >Ver resumen</button>
+        <button
+          class="landing-feedback-btn landing-locked-btn"
+          data-retro-id="${retro.id}"
+          aria-disabled="${finished ? "false" : "true"}"
+          ${finished ? "" : "title=\"Disponible al finalizar la retrospectiva\""}
+          style="padding:9px 13px"
+        >Ver feedback</button>
+        ${!finished ? `
+          <button
+            class="landing-join-btn primary"
+            data-retro-id="${retro.id}"
+            style="padding:9px 13px"
+          >Unirse a la retro →</button>
+        ` : ""}
+      </div>
+      <div class="landing-locked-message" role="status" aria-live="polite" hidden>
+        El resumen y el feedback se van a habilitar una vez que finalice la retrospectiva.
       </div>
     </div>
   `;
@@ -3688,38 +3689,20 @@ async function renderLanding() {
 }
 
 function bindLanding() {
-  const historyNavBtn = document.querySelector("#landingHistoryNavBtn");
-  if (historyNavBtn) {
-    historyNavBtn.onclick = () => {
-      const historySection = document.querySelector("#landingHistorySection");
-      if (historySection) historySection.scrollIntoView({ behavior: "smooth", block: "start" });
-    };
-  }
-
-  const newRetroNavBtn = document.querySelector("#landingNewRetroNavBtn");
-  if (newRetroNavBtn) {
-    newRetroNavBtn.onclick = () => {
-      landingView = "create";
-      renderLanding();
-    };
-  }
-
-  const exploreHistoryBtn = document.querySelector("#landingExploreHistoryBtn");
-  const exploreSummaryBtn = document.querySelector("#landingExploreSummaryBtn");
-
-  const scrollToLandingHistory = () => {
-    const historySection = document.querySelector("#landingHistorySection");
-    if (historySection) historySection.scrollIntoView({ behavior: "smooth", block: "start" });
-  };
-
-  if (exploreHistoryBtn) exploreHistoryBtn.onclick = scrollToLandingHistory;
-  if (exploreSummaryBtn) exploreSummaryBtn.onclick = scrollToLandingHistory;
-
   const back = document.querySelector("#landingBackBtn");
   if (back) back.onclick = async () => { landingView = "home"; await loadLandingRetros(); renderLanding(); };
 
+  const newBtn = document.querySelector("#newRetroBtn");
+  if (newBtn) newBtn.onclick = () => { landingView = "create"; renderLanding(); };
+
   document.querySelectorAll(".landing-summary-btn").forEach(btn => {
     btn.onclick = async () => {
+      if (btn.getAttribute("aria-disabled") === "true") {
+        const message = btn.closest(".landing-retro-row")?.querySelector(".landing-locked-message");
+        if (message) message.hidden = false;
+        return;
+      }
+
       btn.disabled = true;
       const { data, error } = await supabaseClient.rpc("get_retro_summary", { p_retro_id: btn.dataset.retroId });
       btn.disabled = false;
@@ -3745,6 +3728,12 @@ function bindLanding() {
 
   document.querySelectorAll(".landing-feedback-btn").forEach(btn => {
     btn.onclick = async () => {
+      if (btn.getAttribute("aria-disabled") === "true") {
+        const message = btn.closest(".landing-retro-row")?.querySelector(".landing-locked-message");
+        if (message) message.hidden = false;
+        return;
+      }
+
       btn.disabled = true;
       const { data, error } = await supabaseClient.rpc("get_retro_feedback_summary", { p_retro_id: btn.dataset.retroId });
       btn.disabled = false;
@@ -3752,6 +3741,27 @@ function bindLanding() {
       landingSelectedRetro = data;
       landingView = "feedback";
       renderLanding();
+    };
+  });
+
+  document.querySelectorAll(".landing-join-btn").forEach(btn => {
+    btn.onclick = async () => {
+      btn.disabled = true;
+      btn.textContent = "Abriendo…";
+
+      const { data, error } = await supabaseClient
+        .from("retros")
+        .select("codigo")
+        .eq("id", btn.dataset.retroId)
+        .single();
+
+      if (error || !data?.codigo) {
+        btn.disabled = false;
+        btn.textContent = "Unirse a la retro →";
+        return alert("No se pudo abrir la retrospectiva.\n\n" + (error?.message || "No se encontró el código de la retro."));
+      }
+
+      window.location.href = `?retro=${encodeURIComponent(data.codigo)}`;
     };
   });
 

@@ -76,7 +76,12 @@ const state = {
   feedbackSubmitted: false,
   feedbackLoaded: false,
   showFeedback: false,
-  participants: []
+  participants: [],
+
+  // Autosave de respuestas
+  answerAutosaveTimers: {},
+  answerAutosaveStatus: {},
+  editingQuestionAnswers: {}
 };
 
 
@@ -106,6 +111,99 @@ function normalizeTopicText(value) {
     .replace(/[^a-z0-9\s]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function answerDraftStorageKey(questionId) {
+  return `retro-answer-draft-${state.retroId}-${questionId}-${state.participantSessionId || "session"}`;
+}
+
+function getAnswerDraft(questionId) {
+  try {
+    return localStorage.getItem(answerDraftStorageKey(questionId)) || "";
+  } catch (error) {
+    return "";
+  }
+}
+
+function setAnswerDraft(questionId, value) {
+  try {
+    if (String(value || "").trim()) {
+      localStorage.setItem(answerDraftStorageKey(questionId), String(value));
+    } else {
+      localStorage.removeItem(answerDraftStorageKey(questionId));
+    }
+  } catch (error) {
+    console.warn("No se pudo guardar el borrador local de la respuesta:", error);
+  }
+}
+
+function clearAnswerDraft(questionId) {
+  try {
+    localStorage.removeItem(answerDraftStorageKey(questionId));
+  } catch (error) {
+    // El autosave en Supabase sigue funcionando aunque localStorage no esté disponible.
+  }
+}
+
+function setAnswerAutosaveStatus(questionId, status) {
+  state.answerAutosaveStatus[questionId] = status;
+}
+
+function getQuestionAnswerForRender(question) {
+  const draft = getAnswerDraft(question.id);
+  if (draft && !String(question.answer || "").trim()) return draft;
+  return question.answer || "";
+}
+
+async function autosaveGuidingQuestionAnswer(questionId, value) {
+  const answer = String(value || "").trim();
+  const question = state.guidingQuestions.find(item => item.id === questionId);
+  if (!question) return false;
+
+  if (!answer) {
+    setAnswerAutosaveStatus(questionId, "empty");
+    return false;
+  }
+
+  if (answer === String(question.answer || "").trim()) {
+    clearAnswerDraft(questionId);
+    setAnswerAutosaveStatus(questionId, "saved");
+    return true;
+  }
+
+  setAnswerAutosaveStatus(questionId, "saving");
+
+  try {
+    const { data, error } = await supabaseClient.rpc("save_guiding_question_answer", {
+      p_retro_id: state.retroId,
+      p_session_id: state.participantSessionId,
+      p_question_id: questionId,
+      p_respuesta: answer
+    });
+
+    if (error) throw error;
+    if (!data?.success) throw new Error(data?.message || "No se pudo guardar la respuesta.");
+
+    question.answer = answer;
+    clearAnswerDraft(questionId);
+    setAnswerAutosaveStatus(questionId, "saved");
+    return true;
+  } catch (error) {
+    console.error("Error en autosave de respuesta:", error);
+    setAnswerAutosaveStatus(questionId, "error");
+    return false;
+  }
+}
+
+function scheduleGuidingQuestionAutosave(questionId, value, immediate = false) {
+  clearTimeout(state.answerAutosaveTimers[questionId]);
+  setAnswerDraft(questionId, value);
+  setAnswerAutosaveStatus(questionId, String(value || "").trim() ? "saving" : "empty");
+
+  const delay = immediate ? 0 : 900;
+  state.answerAutosaveTimers[questionId] = setTimeout(async () => {
+    await autosaveGuidingQuestionAnswer(questionId, value);
+  }, delay);
 }
 
 
@@ -1169,6 +1267,9 @@ async function resetRetro() {
   state.cards = [];
   state.guidingQuestions = [];
   state.actions = [];
+  state.answerAutosaveTimers = {};
+  state.answerAutosaveStatus = {};
+  state.editingQuestionAnswers = {};
   state.facilitatorSessionId = null;
   state.facilitatorName = null;
   state.isFacilitator = false;
@@ -2596,20 +2697,31 @@ const screens = [
             dynamicTopics.length
               ? dynamicTopics.map(topic => `
                   <div
-                    class="topic"
+                    class="topic topic-sortable"
+                    draggable="${state.isFacilitator ? "true" : "false"}"
+                    data-topic-key="${escapeHtml(topic.key)}"
                     style="display:flex;align-items:center;justify-content:space-between;gap:16px;">
                     <div style="display:flex;align-items:center;gap:12px;min-width:0;">
-                      <strong>${escapeHtml(topic.label)}</strong>
-                      <span class="badge">
-                        ${topic.count}
-                        tarjeta${topic.count === 1 ? "" : "s"}
-                      </span>
+                      ${
+                        state.isFacilitator
+                          ? `<span class="topic-drag-handle" title="Arrastrar para reordenar" aria-label="Arrastrar para reordenar">⋮⋮</span>`
+                          : ""
+                      }
+                      <div style="min-width:0;">
+                        <strong>${escapeHtml(topic.label)}</strong>
+                        <span class="badge" style="margin-left:8px;">
+                          ${topic.count}
+                          tarjeta${topic.count === 1 ? "" : "s"}
+                        </span>
+                      </div>
                     </div>
 
                     ${
                       state.isFacilitator
                         ? `
-                          <div style="display:flex;gap:6px;flex-shrink:0;">
+                          <div style="display:flex;gap:6px;align-items:center;flex-shrink:0;">
+                            <button type="button" class="topic-move-btn" data-topic-move="up" data-topic-key="${escapeHtml(topic.key)}" title="Subir tema" aria-label="Subir tema">↑</button>
+                            <button type="button" class="topic-move-btn" data-topic-move="down" data-topic-key="${escapeHtml(topic.key)}" title="Bajar tema" aria-label="Bajar tema">↓</button>
                             <button
                               type="button"
                               data-topic-action="rename"
@@ -2984,24 +3096,34 @@ const screens = [
                           class="guiding-question-answer"
                           data-question-id="${escapeHtml(question.id)}"
                           rows="4"
-                          ${question.answer ? "disabled" : ""}
+                          ${question.answer && !state.editingQuestionAnswers[question.id] ? "disabled" : ""}
                           required
                           aria-required="true"
                           placeholder="Escriban la respuesta a esta pregunta..."
-                          style="width:100%;resize:vertical;">${escapeHtml(question.answer || "")}</textarea>
+                          style="width:100%;resize:vertical;">${escapeHtml(getQuestionAnswerForRender(question))}</textarea>
                         <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
-                          <span style="font-size:13px;opacity:.62;">La respuesta debe estar guardada para poder continuar.</span>
+                          <span class="answer-autosave-status" data-question-id="${escapeHtml(question.id)}" style="font-size:13px;opacity:.62;">
+                            ${
+                              state.answerAutosaveStatus[question.id] === "saving"
+                                ? "Guardando automáticamente…"
+                                : state.answerAutosaveStatus[question.id] === "error"
+                                  ? "No se pudo guardar automáticamente. Se reintentará al editar."
+                                  : getQuestionAnswerForRender(question)
+                                    ? "Respuesta guardada automáticamente"
+                                    : "La respuesta se guarda automáticamente al escribir."
+                            }
+                          </span>
                           <div style="display:flex;align-items:center;gap:8px;">
                             ${
                               question.answer
                                 ? `
                                   <button
                                     type="button"
-                                    class="save-guiding-question-answer answer-saved"
+                                    class="answer-autosave-indicator"
                                     data-question-id="${escapeHtml(question.id)}"
                                     disabled
                                     style="padding:9px 13px;opacity:.8;cursor:default;">
-                                    Respuesta guardada
+                                    ${state.answerAutosaveStatus[question.id] === "saving" ? "Guardando…" : "Respuesta guardada"}
                                   </button>
                                   <button
                                     type="button"
@@ -3021,10 +3143,11 @@ const screens = [
                                 : `
                                   <button
                                     type="button"
-                                    class="save-guiding-question-answer"
+                                    class="answer-autosave-indicator"
                                     data-question-id="${escapeHtml(question.id)}"
-                                    style="padding:9px 13px;">
-                                    Guardar respuesta
+                                    disabled
+                                    style="padding:9px 13px;opacity:.65;cursor:default;">
+                                    ${state.answerAutosaveStatus[question.id] === "saving" ? "Guardando…" : "Autosave activo"}
                                   </button>
                                 `
                             }
@@ -3663,7 +3786,7 @@ function adminRetroRow(retro) {
         <button class="admin-toggle-public-btn" data-retro-id="${retro.id}" data-publicada="${published}" style="padding:9px 13px">
           ${published ? "Archivar" : "Publicar"}
         </button>
-        <button class="admin-delete-retro-btn" data-retro-id="${retro.id}" data-retro-label="${teams} · ${date}" style="padding:9px 13px;border-color:rgba(255,100,100,.35);color:#ca0000">
+        <button class="admin-delete-retro-btn" data-retro-id="${retro.id}" data-retro-label="${teams} · ${date}" style="padding:9px 13px;border-color:rgba(255,100,100,.35);color:#ff9b9b">
           Eliminar
         </button>
       </div>
@@ -3915,15 +4038,20 @@ async function loadGuidingQuestions() {
     return;
   }
 
-  state.guidingQuestions = (data || []).map(question => ({
-    id: question.id,
-    topicKey: question.topic_key,
-    text: question.pregunta,
-    answer: question.respuesta || "",
-    origin: question.origen,
-    authorSessionId: question.autor_session_id,
-    order: question.orden
-  }));
+  state.guidingQuestions = (data || []).map(question => {
+    const answer = question.respuesta || "";
+    if (answer) clearAnswerDraft(question.id);
+
+    return {
+      id: question.id,
+      topicKey: question.topic_key,
+      text: question.pregunta,
+      answer,
+      origin: question.origen,
+      authorSessionId: question.autor_session_id,
+      order: question.orden
+    };
+  });
 
   console.log("Preguntas cargadas:", state.guidingQuestions);
 }
@@ -4355,7 +4483,8 @@ function subscribeToGuidingQuestions() {
         await loadGuidingQuestions();
 
         if (state.step === 5 || state.step === 6 || state.step === 7) {
-          render();
+          const editingAnswer = Object.values(state.editingQuestionAnswers).some(Boolean);
+          if (!editingAnswer) render();
         }
       }
     )
@@ -4448,6 +4577,84 @@ function subscribeToActions() {
 // =====================================================
 // EVENTOS
 // =====================================================
+
+async function persistTopicOrder(orderedTopics) {
+  if (!state.isFacilitator || !state.retroId || !state.participantSessionId) return false;
+
+  const payload = orderedTopics.map((topic, index) => ({
+    topic_key: topic.key,
+    orden: index
+  }));
+
+  const { data, error } = await supabaseClient.rpc("reorder_topics", {
+    p_retro_id: state.retroId,
+    p_session_id: state.participantSessionId,
+    p_orders: payload
+  });
+
+  if (error) throw error;
+  if (!data?.success) throw new Error(data?.message || "No se pudo guardar el orden de los temas.");
+
+  await loadTopics();
+  return true;
+}
+
+async function moveTopic(topicKey, direction) {
+  const topics = getDynamicTopics().slice();
+  const index = topics.findIndex(topic => topic.key === topicKey);
+  if (index < 0) return;
+
+  const targetIndex = direction === "up" ? index - 1 : index + 1;
+  if (targetIndex < 0 || targetIndex >= topics.length) return;
+
+  [topics[index], topics[targetIndex]] = [topics[targetIndex], topics[index]];
+
+  state.topics = state.topics.map(topic => {
+    const nextIndex = topics.findIndex(item => item.key === topic.topic_key);
+    return nextIndex >= 0 ? { ...topic, orden: nextIndex } : topic;
+  });
+
+  render();
+
+  try {
+    await persistTopicOrder(topics);
+    render();
+  } catch (error) {
+    console.error("Error reordenando temas:", error);
+    await loadTopics();
+    render();
+    alert("No se pudo guardar el nuevo orden.\n\n" + error.message);
+  }
+}
+
+async function dropTopic(topicKey, draggedTopicKey) {
+  if (!draggedTopicKey || draggedTopicKey === topicKey) return;
+
+  const topics = getDynamicTopics().slice();
+  const fromIndex = topics.findIndex(topic => topic.key === draggedTopicKey);
+  const toIndex = topics.findIndex(topic => topic.key === topicKey);
+  if (fromIndex < 0 || toIndex < 0) return;
+
+  const [moved] = topics.splice(fromIndex, 1);
+  topics.splice(toIndex, 0, moved);
+
+  state.topics = state.topics.map(topic => {
+    const nextIndex = topics.findIndex(item => item.key === topic.topic_key);
+    return nextIndex >= 0 ? { ...topic, orden: nextIndex } : topic;
+  });
+
+  render();
+
+  try {
+    await persistTopicOrder(topics);
+    render();
+  } catch (error) {
+    console.error("Error reordenando temas:", error);
+    await loadTopics();
+    render();
+    alert("No se pudo guardar el nuevo orden.\n\n" + error.message);
+  }
+}
 
 async function bind() {
 
@@ -5059,6 +5266,51 @@ async function bind() {
       }
     };
   }
+
+
+  document.querySelectorAll("[data-topic-move]").forEach(button => {
+    button.onclick = async () => {
+      if (!state.isFacilitator) return;
+      await moveTopic(button.dataset.topicKey, button.dataset.topicMove);
+    };
+  });
+
+  let draggedTopicKey = null;
+  document.querySelectorAll(".topic-sortable").forEach(topicEl => {
+    topicEl.addEventListener("dragstart", event => {
+      if (!state.isFacilitator) return;
+      draggedTopicKey = topicEl.dataset.topicKey;
+      topicEl.classList.add("topic-dragging");
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData("text/plain", draggedTopicKey);
+    });
+
+    topicEl.addEventListener("dragend", () => {
+      draggedTopicKey = null;
+      topicEl.classList.remove("topic-dragging");
+      document.querySelectorAll(".topic-drag-over").forEach(el => el.classList.remove("topic-drag-over"));
+    });
+
+    topicEl.addEventListener("dragover", event => {
+      if (!state.isFacilitator || !draggedTopicKey) return;
+      event.preventDefault();
+      topicEl.classList.add("topic-drag-over");
+      event.dataTransfer.dropEffect = "move";
+    });
+
+    topicEl.addEventListener("dragleave", () => {
+      topicEl.classList.remove("topic-drag-over");
+    });
+
+    topicEl.addEventListener("drop", async event => {
+      if (!state.isFacilitator) return;
+      event.preventDefault();
+      topicEl.classList.remove("topic-drag-over");
+      const sourceKey = event.dataTransfer.getData("text/plain") || draggedTopicKey;
+      draggedTopicKey = null;
+      await dropTopic(topicEl.dataset.topicKey, sourceKey);
+    });
+  });
 
 
   document
@@ -5742,105 +5994,44 @@ async function bind() {
     };
   }
 
-  document.querySelectorAll(".save-guiding-question-answer").forEach(button => {
-    button.onclick = async () => {
-      const questionId = button.dataset.questionId;
-      const input = document.querySelector(`#questionAnswer-${questionId}`);
-      const answer = input ? input.value.trim() : "";
+  // ===================================================
+  // AUTOSAVE DE RESPUESTAS
+  // ===================================================
 
-      if (!answer) {
-        alert("Escribí una respuesta antes de guardarla.");
-        if (input) input.focus();
-        return;
-      }
+  document.querySelectorAll(".guiding-question-answer").forEach(input => {
+    const questionId = input.dataset.questionId;
 
-      button.disabled = true;
-      const originalText = button.textContent;
-      button.textContent = "Guardando…";
+    input.addEventListener("input", () => {
+      state.editingQuestionAnswers[questionId] = true;
+      scheduleGuidingQuestionAutosave(questionId, input.value);
 
-      try {
-        const { data, error } = await supabaseClient.rpc("save_guiding_question_answer", {
-          p_retro_id: state.retroId,
-          p_session_id: state.participantSessionId,
-          p_question_id: questionId,
-          p_respuesta: answer
-        });
+      const status = document.querySelector(`.answer-autosave-status[data-question-id="${questionId}"]`);
+      if (status) status.textContent = String(input.value || "").trim()
+        ? "Guardando automáticamente…"
+        : "La respuesta se guarda automáticamente al escribir.";
 
-        if (error) throw error;
-        if (!data?.success) {
-          throw new Error(data?.message || "No se pudo guardar la respuesta.");
-        }
+      const indicator = document.querySelector(`.answer-autosave-indicator[data-question-id="${questionId}"]`);
+      if (indicator) indicator.textContent = "Guardando…";
+    });
 
-        await loadGuidingQuestions();
-        render();
-      } catch (error) {
-        console.error("Error guardando respuesta:", error);
-        alert("No se pudo guardar la respuesta.\n\n" + error.message);
-        button.disabled = false;
-        button.textContent = originalText;
-      }
-    };
+    input.addEventListener("blur", () => {
+      const answer = input.value.trim();
+      if (answer) scheduleGuidingQuestionAutosave(questionId, answer, true);
+    });
   });
 
   document.querySelectorAll(".edit-guiding-question-answer").forEach(button => {
     button.onclick = () => {
       const questionId = button.dataset.questionId;
+      state.editingQuestionAnswers[questionId] = true;
+      setAnswerAutosaveStatus(questionId, "editing");
+      render();
       const input = document.querySelector(`#questionAnswer-${questionId}`);
-      if (!input) return;
-
-      input.disabled = false;
-      input.focus();
-      input.setSelectionRange(input.value.length, input.value.length);
-
-      const container = button.closest(".topic");
-      if (!container) return;
-
-      const actions = container.querySelector(".save-guiding-question-answer")?.parentElement;
-      if (!actions) return;
-
-      actions.innerHTML = `
-        <button
-          type="button"
-          class="save-guiding-question-answer"
-          data-question-id="${escapeHtml(questionId)}"
-          style="padding:9px 13px;">
-          Guardar respuesta
-        </button>
-      `;
-
-      const saveButton = actions.querySelector(".save-guiding-question-answer");
-      if (saveButton) {
-        saveButton.onclick = async () => {
-          const answer = input.value.trim();
-          if (!answer) {
-            alert("Escribí una respuesta antes de guardarla.");
-            input.focus();
-            return;
-          }
-
-          saveButton.disabled = true;
-          saveButton.textContent = "Guardando…";
-          try {
-            const { data, error } = await supabaseClient.rpc("save_guiding_question_answer", {
-              p_retro_id: state.retroId,
-              p_session_id: state.participantSessionId,
-              p_question_id: questionId,
-              p_respuesta: answer
-            });
-            if (error) throw error;
-            if (!data?.success) throw new Error(data?.message || "No se pudo guardar la respuesta.");
-            await loadGuidingQuestions();
-            render();
-          } catch (error) {
-            console.error("Error guardando respuesta:", error);
-            alert("No se pudo guardar la respuesta.\n\n" + error.message);
-            saveButton.disabled = false;
-            saveButton.textContent = "Guardar respuesta";
-          }
-        };
+      if (input) {
+        input.disabled = false;
+        input.focus();
+        input.setSelectionRange(input.value.length, input.value.length);
       }
-
-      container.querySelectorAll(".edit-guiding-question-answer, .delete-guiding-question-answer").forEach(el => el.remove());
     };
   });
 
@@ -5852,7 +6043,9 @@ async function bind() {
 
       if (!confirm("¿Eliminar la respuesta de esta pregunta?")) return;
 
+      clearTimeout(state.answerAutosaveTimers[questionId]);
       button.disabled = true;
+
       try {
         const { data, error } = await supabaseClient.rpc("save_guiding_question_answer", {
           p_retro_id: state.retroId,
@@ -5862,7 +6055,11 @@ async function bind() {
         });
         if (error) throw error;
         if (!data?.success) throw new Error(data?.message || "No se pudo eliminar la respuesta.");
-        await loadGuidingQuestions();
+
+        question.answer = "";
+        delete state.editingQuestionAnswers[questionId];
+        delete state.answerAutosaveStatus[questionId];
+        clearAnswerDraft(questionId);
         render();
       } catch (error) {
         console.error("Error eliminando respuesta:", error);
@@ -5919,6 +6116,10 @@ async function bind() {
             p_respuesta: ""
           });
           if (answerResetError) throw answerResetError;
+          clearTimeout(state.answerAutosaveTimers[questionId]);
+          clearAnswerDraft(questionId);
+          delete state.editingQuestionAnswers[questionId];
+          delete state.answerAutosaveStatus[questionId];
 
           await loadGuidingQuestions();
           render();

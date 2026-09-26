@@ -260,6 +260,28 @@ function getDynamicTopics() {
 }
 
 
+function shouldSkipVotingStep() {
+  return getDynamicTopics().length === 1;
+}
+
+function normalizeStepForTopics(step) {
+  const numericStep = Number(step);
+  return numericStep === 4 && shouldSkipVotingStep() ? 5 : numericStep;
+}
+
+function getProgressMeta(step) {
+  const skippedVoting = shouldSkipVotingStep();
+  const visibleSteps = skippedVoting
+    ? steps.filter((_, index) => index !== 4)
+    : steps;
+  const visibleIndex = visibleSteps.indexOf(steps[Number(step)]);
+
+  return {
+    current: Math.max(0, visibleIndex) + 1,
+    total: visibleSteps.length
+  };
+}
+
 function getTopicLabel(topicKey) {
   if (!topicKey) return "Sin agrupar";
 
@@ -1421,6 +1443,32 @@ async function advanceRetro() {
 
   }
 
+  // Si solo existe un tema en común, no tiene sentido pasar por votación.
+  // Avanzamos una etapa adicional para llegar directamente a Preguntas guía.
+  if (state.step === 4 && shouldSkipVotingStep()) {
+    const { data: skippedData, error: skippedError } = await supabaseClient
+      .rpc(
+        "advance_retro",
+        {
+          p_retro_id: state.retroId,
+          p_session_id: state.participantSessionId
+        }
+      );
+
+    if (skippedError) {
+      console.error("Error omitiendo la etapa de votación:", skippedError);
+      alert(
+        "No se pudo omitir la etapa de votación.\n\n" +
+        skippedError.message
+      );
+      return;
+    }
+
+    if (skippedData?.step !== undefined) {
+      state.step = Number(skippedData.step);
+    }
+  }
+
   if (state.step === steps.length - 1) {
     const { data: finishedData, error: finishedError } = await supabaseClient.rpc(
       "mark_retro_finished",
@@ -1510,6 +1558,32 @@ async function previousRetroStep() {
 
   }
 
+  // Si la retro tiene un solo tema, la etapa 4 (Votación) se omite también
+  // al volver hacia atrás: desde Preguntas guía volvemos directamente a Agrupación.
+  if (state.step === 4 && shouldSkipVotingStep()) {
+    const { data: skippedData, error: skippedError } = await supabaseClient
+      .rpc(
+        "previous_retro_step",
+        {
+          p_retro_id: state.retroId,
+          p_session_id: state.participantSessionId
+        }
+      );
+
+    if (skippedError) {
+      console.error("Error omitiendo la etapa de votación al retroceder:", skippedError);
+      alert(
+        "No se pudo omitir la etapa de votación.\n\n" +
+        skippedError.message
+      );
+      return;
+    }
+
+    if (skippedData?.step !== undefined) {
+      state.step = Number(skippedData.step);
+    }
+  }
+
   render();
 }
 
@@ -1548,7 +1622,7 @@ async function refreshRetroState() {
 
 
   state.step =
-    Number(data.paso_actual || 0);
+    normalizeStepForTopics(Number(data.paso_actual || 0));
 
   state.facilitatorSessionId =
     data.facilitador_session_id || null;
@@ -2072,11 +2146,12 @@ function render() {
     stepLabel.textContent = "Preparación";
     progressBar.style.width = "0%";
   } else {
+    const progressMeta = getProgressMeta(state.step);
     stepLabel.textContent =
-      `${state.step + 1} / ${steps.length}`;
+      `${progressMeta.current} / ${progressMeta.total}`;
 
     progressBar.style.width =
-      `${((state.step + 1) / steps.length) * 100}%`;
+      `${(progressMeta.current / progressMeta.total) * 100}%`;
   }
 
 
@@ -2174,7 +2249,7 @@ const screens = [
     <section class="hero">
 
       <div class="pill">
-        Tengamos siempre presentes estos fundamentos.
+        RETRO · Q3 2026
       </div>
 
       <h1>
@@ -3865,8 +3940,8 @@ function subscribeToRetro() {
 
 
         const newStep =
-          Number(
-            payload.new.paso_actual || 0
+          normalizeStepForTopics(
+            Number(payload.new.paso_actual || 0)
           );
 
         const newFacilitator =
@@ -4030,6 +4105,8 @@ function subscribeToCards() {
         }
 
 
+        state.step = normalizeStepForTopics(state.step);
+
         if (
           state.step === 2 ||
           state.step === 3 ||
@@ -4074,6 +4151,7 @@ function subscribeToTopics() {
       async payload => {
         console.log("Cambio de temas en común recibido:", payload);
         await loadTopics();
+        state.step = normalizeStepForTopics(state.step);
 
         if (state.step >= 3 && state.step <= 7) {
           render();

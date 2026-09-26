@@ -147,6 +147,22 @@ function clearAnswerDraft(questionId) {
 
 function setAnswerAutosaveStatus(questionId, status) {
   state.answerAutosaveStatus[questionId] = status;
+
+  const statusElement = document.querySelector(`.answer-autosave-status[data-question-id="${questionId}"]`);
+  if (!statusElement) return;
+
+  if (status === "saving") {
+    statusElement.textContent = "Guardando…";
+    statusElement.style.color = "";
+  } else if (status === "saved") {
+    statusElement.innerHTML = '<span style="color:#35d07f;font-weight:600;">✓ Respuesta guardada</span>';
+  } else if (status === "error") {
+    statusElement.textContent = "No se pudo guardar. Se reintentará al editar.";
+    statusElement.style.color = "";
+  } else {
+    statusElement.textContent = "";
+    statusElement.style.color = "";
+  }
 }
 
 function getQuestionAnswerForRender(question) {
@@ -3786,7 +3802,7 @@ function adminRetroRow(retro) {
         <button class="admin-toggle-public-btn" data-retro-id="${retro.id}" data-publicada="${published}" style="padding:9px 13px">
           ${published ? "Archivar" : "Publicar"}
         </button>
-        <button class="admin-delete-retro-btn" data-retro-id="${retro.id}" data-retro-label="${teams} · ${date}" style="padding:9px 13px;border-color:rgba(255,100,100,.35);color:#ff9b9b">
+        <button class="admin-delete-retro-btn" data-retro-id="${retro.id}" data-retro-label="${teams} · ${date}" style="padding:9px 13px;border-color:rgba(255,100,100,.35);color:#d70000">
           Eliminar
         </button>
       </div>
@@ -6006,12 +6022,10 @@ async function bind() {
       scheduleGuidingQuestionAutosave(questionId, input.value);
 
       const status = document.querySelector(`.answer-autosave-status[data-question-id="${questionId}"]`);
-      if (status) status.textContent = String(input.value || "").trim()
-        ? "Guardando automáticamente…"
-        : "La respuesta se guarda automáticamente al escribir.";
-
-      const indicator = document.querySelector(`.answer-autosave-indicator[data-question-id="${questionId}"]`);
-      if (indicator) indicator.textContent = "Guardando…";
+      if (status) {
+        status.textContent = String(input.value || "").trim() ? "Guardando…" : "";
+        status.style.color = "";
+      }
     });
 
     input.addEventListener("blur", () => {

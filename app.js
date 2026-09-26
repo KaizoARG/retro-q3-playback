@@ -5687,6 +5687,13 @@ async function bind() {
           .value
         || null;
 
+      const successCriteria =
+        document
+          .querySelector("#actionWhy")
+          .value
+          .trim()
+        || null;
+
 
       add.disabled = true;
 
@@ -5700,6 +5707,7 @@ async function bind() {
           descripcion: text,
           responsable: owner,
           fecha: date,
+          criterio_exito: successCriteria,
           retro_id: state.retroId
         })
         .select()
@@ -5748,7 +5756,11 @@ async function bind() {
 
         date:
           data.fecha ||
-          "Por definir"
+          "Por definir",
+
+        successCriteria:
+          data.criterio_exito ||
+          ""
 
       };
 

@@ -3531,8 +3531,7 @@ function landingHome() {
 
       <div id="landingHistorySection" class="card landing-history-card">
         <div class="landing-history-header">
-          <div><div class="eyebrow">Historial</div><h2>Retrospectivas anteriores</h2></div>
-          <button id="newRetroBtn" class="primary" style="padding:12px 18px">+ Crear nueva retro</button>
+          <h2>Historial de retros</h2>
         </div>
         <div id="landingHistory" class="landing-history-content">
           ${landingRetros.length ? landingRetros.map(landingRetroRow).join("") : `
@@ -3540,7 +3539,6 @@ function landingHome() {
               <div class="landing-empty-icon">📋</div>
               <h3>Todavía no hay retros</h3>
               <p>Cuando finalices una retrospectiva, va a aparecer acá automáticamente.</p>
-              <button id="landingEmptyNewRetroBtn" class="ghost">+ Crear primera retro</button>
             </div>
           `}
         </div>
@@ -3713,7 +3711,6 @@ function bindLanding() {
 
   const exploreHistoryBtn = document.querySelector("#landingExploreHistoryBtn");
   const exploreSummaryBtn = document.querySelector("#landingExploreSummaryBtn");
-  const emptyNewRetroBtn = document.querySelector("#landingEmptyNewRetroBtn");
 
   const scrollToLandingHistory = () => {
     const historySection = document.querySelector("#landingHistorySection");
@@ -3722,13 +3719,9 @@ function bindLanding() {
 
   if (exploreHistoryBtn) exploreHistoryBtn.onclick = scrollToLandingHistory;
   if (exploreSummaryBtn) exploreSummaryBtn.onclick = scrollToLandingHistory;
-  if (emptyNewRetroBtn) emptyNewRetroBtn.onclick = () => { landingView = "create"; renderLanding(); };
 
   const back = document.querySelector("#landingBackBtn");
   if (back) back.onclick = async () => { landingView = "home"; await loadLandingRetros(); renderLanding(); };
-
-  const newBtn = document.querySelector("#newRetroBtn");
-  if (newBtn) newBtn.onclick = () => { landingView = "create"; renderLanding(); };
 
   document.querySelectorAll(".landing-summary-btn").forEach(btn => {
     btn.onclick = async () => {

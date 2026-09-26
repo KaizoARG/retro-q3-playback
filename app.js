@@ -16,11 +16,7 @@ const urlParams = new URLSearchParams(window.location.search);
 const RETRO_CODE =
   urlParams.get("retro") || null;
 
-const RETRO_ID_PARAM =
-  urlParams.get("retro_id") || null;
-
 console.log("Código de retro:", RETRO_CODE);
-console.log("ID de retro:", RETRO_ID_PARAM);
 
 
 // =====================================================
@@ -1969,9 +1965,14 @@ function feedbackLanding() {
         <p class="lead" style="margin-top:14px">
           Tu feedback nos ayuda a mejorar tanto el espacio como la herramienta.
         </p>
-        <button type="button" id="feedbackBackBtn" style="margin-top:24px;padding:11px 16px;border-radius:10px;cursor:pointer;background:transparent;border:1px solid rgba(255,255,255,.18);color:inherit">
-          ← Volver al cierre
-        </button>
+        <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:24px">
+          <button type="button" id="feedbackBackBtn" style="padding:11px 16px;border-radius:10px;cursor:pointer;background:transparent;border:1px solid rgba(255,255,255,.18);color:inherit">
+            ← Volver al cierre
+          </button>
+          <button type="button" id="feedbackHomeBtn" class="primary" style="padding:11px 16px">
+            Volver a la página principal
+          </button>
+        </div>
       </section>
     `;
   }
@@ -2056,6 +2057,11 @@ function render() {
 
     const submitFeedbackBtn = document.querySelector("#submitFeedbackBtn");
     if (submitFeedbackBtn) submitFeedbackBtn.onclick = submitFeedback;
+
+    const feedbackHomeBtn = document.querySelector("#feedbackHomeBtn");
+    if (feedbackHomeBtn) feedbackHomeBtn.onclick = () => {
+      window.location.href = "https://diemontefusco.github.io/retrospectivas/";
+    };
     return;
   }
 
@@ -2992,6 +2998,7 @@ const screens = [
                     ·
                     ${escapeHtml(action.date)}
                   </div>
+                  ${action.successCriteria ? `<div style="margin-top:8px;opacity:.78"><strong>¿Cómo sabremos que funcionó?</strong><br>${escapeHtml(action.successCriteria)}</div>` : ""}
 
                 </div>
 
@@ -3236,12 +3243,7 @@ function landingHome() {
 function landingRetroRow(retro) {
   const teams = escapeHtml(retro.equipos || retro.nombre || "Equipos no definidos");
   const date = escapeHtml(formatLandingDate(retro.fecha));
-  const isFinished = Boolean(retro.finalizada_en);
-  const status = isFinished
-    ? "Finalizada"
-    : (retro.iniciada ? "En progreso" : "Pendiente de inicio");
-  const retroId = escapeHtml(retro.id || "");
-
+  const status = retro.finalizada_en ? "Finalizada" : "En preparación";
   return `
     <div style="display:flex;justify-content:space-between;align-items:center;gap:18px;padding:18px 0;border-bottom:1px solid rgba(255,255,255,.08);flex-wrap:wrap">
       <div style="min-width:260px;flex:1">
@@ -3249,25 +3251,8 @@ function landingRetroRow(retro) {
         <div style="opacity:.65;margin-top:5px">${status}</div>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button
-          class="landing-summary-btn${isFinished ? "" : " landing-history-disabled"}"
-          data-retro-id="${retro.id}"
-          ${isFinished ? "" : "disabled"}
-          style="padding:9px 13px"
-        >Ver resumen</button>
-        <button
-          class="landing-feedback-btn${isFinished ? "" : " landing-history-disabled"}"
-          data-retro-id="${retro.id}"
-          ${isFinished ? "" : "disabled"}
-          style="padding:9px 13px"
-        >Ver feedback</button>
-        ${!isFinished && retroId ? `
-          <button
-            class="landing-join-btn primary"
-            data-retro-id="${retroId}"
-            style="padding:9px 13px"
-          >Unirme a la retro →</button>
-        ` : ""}
+        <button class="landing-summary-btn" data-retro-id="${retro.id}" style="padding:9px 13px">Ver resumen</button>
+        <button class="landing-feedback-btn" data-retro-id="${retro.id}" style="padding:9px 13px">Ver feedback</button>
       </div>
     </div>
   `;
@@ -3299,7 +3284,32 @@ function landingSummaryView(summary) {
   const topics = summary?.topics || [];
   const topTopic = topics.find(t => t.key === summary?.top_topic_key) || topics[0];
 
+  const activityLabels = {
+    green: "¿Qué salió bien?",
+    red: "¿Qué nos dolió?",
+    blue: "Ideas / Sugerencias"
+  };
+
   const cardsForTopic = topTopic ? cards.filter(c => c.topic_key === topTopic.key) : cards;
+
+  const renderAction = action => {
+    const title = action.descripcion || action.text || "Sin título";
+    const owner = action.responsable || action.owner || "Por definir";
+    const date = action.fecha || action.date || "Por definir";
+    const successCriteria = action.criterio_exito ?? action.como_sabremos ?? action.criterio ?? action.successCriteria ?? null;
+
+    return `
+      <div style="padding:16px 0;border-bottom:1px solid rgba(255,255,255,.08)">
+        <div style="font-weight:700;font-size:16px">${escapeHtml(title)}</div>
+        <div style="display:grid;gap:8px;margin-top:10px">
+          <div><span class="badge">RESPONSABLE</span><div style="margin-top:4px">${escapeHtml(owner)}</div></div>
+          <div><span class="badge">FECHA COMPROMETIDA</span><div style="margin-top:4px">${escapeHtml(date)}</div></div>
+          ${successCriteria ? `<div><span class="badge">¿CÓMO SABREMOS QUE FUNCIONÓ?</span><div style="margin-top:4px">${escapeHtml(successCriteria)}</div></div>` : ""}
+        </div>
+      </div>
+    `;
+  };
+
   return `
     <section style="max-width:980px;margin:0 auto;padding:48px 20px 80px">
       <button id="landingBackBtn" style="padding:9px 13px">← Volver al historial</button>
@@ -3314,15 +3324,25 @@ function landingSummaryView(summary) {
       </div>
 
       <div class="grid" style="margin-top:20px">
-        <div class="card"><div class="eyebrow">Preguntas guía</div>${questions.length ? `<ul>${questions.map(q=>`<li style="margin:10px 0">${escapeHtml(q.pregunta || q.text || "")}</li>`).join("")}</ul>` : `<p style="opacity:.65">No se registraron preguntas guía.</p>`}</div>
-        <div class="card"><div class="eyebrow">Acciones acordadas</div>${actions.length ? `<ul>${actions.map(a=>`<li style="margin:10px 0"><strong>${escapeHtml(a.descripcion || a.text || "")}</strong><br><span style="opacity:.65">${escapeHtml(a.responsable || a.owner || "Por definir")} · ${escapeHtml(a.fecha || a.date || "Por definir")}</span></li>`).join("")}</ul>` : `<p style="opacity:.65">No se registraron acciones.</p>`}</div>
+        <div class="card"><div class="eyebrow">Preguntas</div>${questions.length ? `<ul>${questions.map(q=>`<li style="margin:10px 0">${escapeHtml(q.pregunta || q.text || "")}</li>`).join("")}</ul>` : `<p style="opacity:.65">No se registraron preguntas.</p>`}</div>
+        <div class="card">
+          <div class="eyebrow">Acciones acordadas</div>
+          ${actions.length ? `<div style="margin-top:4px">${actions.map(renderAction).join("")}</div>` : `<p style="opacity:.65">No se registraron acciones.</p>`}
+        </div>
       </div>
 
-      <div class="card" style="margin-top:20px"><div class="eyebrow">Actividad completa</div>${cards.length ? `<div style="display:grid;gap:10px;margin-top:14px">${cards.map(c=>`<div><span class="badge">${escapeHtml(c.etapa || "Actividad")}</span> ${escapeHtml(c.contenido)}</div>`).join("")}</div>` : `<p style="opacity:.65">No hay tarjetas registradas.</p>`}</div>
+      <div class="card" style="margin-top:20px">
+        <div class="eyebrow">Actividad completa</div>
+        ${cards.length ? `<div style="display:grid;gap:12px;margin-top:14px">${cards.map(c=>`
+          <div style="padding:12px 14px;border-radius:10px;background:rgba(255,255,255,.04)">
+            <div class="badge">${escapeHtml(activityLabels[c.etapa] || c.etapa || "Actividad")}</div>
+            <div style="margin-top:6px">${escapeHtml(c.contenido)}</div>
+          </div>
+        `).join("")}</div>` : `<p style="opacity:.65">No hay tarjetas registradas.</p>`}
+      </div>
     </section>
   `;
 }
-
 function landingFeedbackView(data) {
   const rows = data?.feedback || [];
   const avg = data?.average_rating;
@@ -3383,7 +3403,6 @@ function bindLanding() {
 
   document.querySelectorAll(".landing-feedback-btn").forEach(btn => {
     btn.onclick = async () => {
-      if (btn.disabled) return;
       btn.disabled = true;
       const { data, error } = await supabaseClient.rpc("get_retro_feedback_summary", { p_retro_id: btn.dataset.retroId });
       btn.disabled = false;
@@ -3391,21 +3410,6 @@ function bindLanding() {
       landingSelectedRetro = data;
       landingView = "feedback";
       renderLanding();
-    };
-  });
-
-  document.querySelectorAll(".landing-join-btn").forEach(btn => {
-    btn.onclick = () => {
-      const retroId = btn.dataset.retroId;
-      if (!retroId) return;
-
-      const name = window.prompt("Ingresá tu nombre y apellido para unirte a la retro:");
-      const cleanName = String(name || "").trim();
-
-      if (!cleanName) return;
-
-      sessionStorage.setItem(`retro-join-name-${retroId}`, cleanName);
-      window.location.href = `?retro_id=${encodeURIComponent(retroId)}`;
     };
   });
 
@@ -3483,7 +3487,7 @@ function adminRetroRow(retro) {
         <button class="admin-toggle-public-btn" data-retro-id="${retro.id}" data-publicada="${published}" style="padding:9px 13px">
           ${published ? "Archivar" : "Publicar"}
         </button>
-        <button class="admin-delete-retro-btn" data-retro-id="${retro.id}" data-retro-label="${teams} · ${date}" style="padding:9px 13px;border-color:rgba(255,100,100,.35);color:#c30909">
+        <button class="admin-delete-retro-btn" data-retro-id="${retro.id}" data-retro-label="${teams} · ${date}" style="padding:9px 13px;border-color:rgba(255,100,100,.35);color:#ff9b9b">
           Eliminar
         </button>
       </div>
@@ -3601,19 +3605,14 @@ async function initializeLanding() {
 
 async function loadRetro() {
 
-  let retroQuery = supabaseClient
-    .from("retros")
-    .select(
-      "id, codigo, nombre, paso_actual, facilitador_session_id, facilitador_nombre, iniciada, iniciada_en, finalizada_en"
-    );
-
-  if (RETRO_ID_PARAM) {
-    retroQuery = retroQuery.eq("id", RETRO_ID_PARAM);
-  } else {
-    retroQuery = retroQuery.eq("codigo", RETRO_CODE);
-  }
-
-  const { data, error } = await retroQuery.single();
+  const { data, error } =
+    await supabaseClient
+      .from("retros")
+      .select(
+        "id, codigo, nombre, paso_actual, facilitador_session_id, facilitador_nombre, iniciada, iniciada_en, finalizada_en"
+      )
+      .eq("codigo", RETRO_CODE)
+      .single();
 
   if (error) {
 
@@ -3783,7 +3782,9 @@ async function loadActions() {
       id: action.id,
       text: action.descripcion,
       owner: action.responsable,
-      date: action.fecha || "Por definir"
+      date: action.fecha || "Por definir",
+      successCriteria: action.criterio_exito ?? action.como_sabremos ?? action.criterio ?? null,
+      raw: action
     }));
 
   console.log(
@@ -4236,7 +4237,9 @@ function subscribeToActions() {
             "Por definir",
           date:
             payload.new.fecha ||
-            "Por definir"
+            "Por definir",
+          successCriteria: payload.new.criterio_exito ?? payload.new.como_sabremos ?? payload.new.criterio ?? null,
+          raw: payload.new
         });
 
         if (
@@ -5858,7 +5861,7 @@ async function initialize() {
     return;
   }
 
-  if (!RETRO_CODE && !RETRO_ID_PARAM) {
+  if (!RETRO_CODE) {
     await initializeLanding();
     return;
   }
@@ -5896,23 +5899,6 @@ async function initialize() {
     );
 
     return;
-  }
-
-
-  // Si llegamos desde el historial mediante “Unirme a la retro”,
-  // el nombre se solicitó antes de entrar y queda pendiente en sessionStorage.
-  const pendingJoinNameKey = RETRO_ID_PARAM
-    ? `retro-join-name-${RETRO_ID_PARAM}`
-    : null;
-  const pendingJoinName = pendingJoinNameKey
-    ? sessionStorage.getItem(pendingJoinNameKey)
-    : null;
-
-  if (pendingJoinName) {
-    const saved = await setParticipantProfile(pendingJoinName, false);
-    if (saved) {
-      sessionStorage.removeItem(pendingJoinNameKey);
-    }
   }
 
 

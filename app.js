@@ -3550,8 +3550,9 @@ function landingRetroRow(retro) {
   const date = escapeHtml(formatLandingDate(retro.fecha));
   const isFinished = Boolean(retro.finalizada_en);
   const isInProgress = Boolean(retro.iniciada || retro.iniciada_en) && !isFinished;
+  const isJoinable = Boolean(retro.codigo) && !isFinished;
   const status = isFinished ? "Finalizada" : (isInProgress ? "En curso" : "En preparación");
-  const joinButton = isInProgress && retro.codigo ? `
+  const joinButton = isJoinable ? `
         <button class="primary landing-join-btn" data-retro-code="${escapeHtml(retro.codigo)}" style="padding:9px 13px">Unirse a la retrospectiva →</button>
   ` : "";
 

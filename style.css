@@ -122,7 +122,6 @@ textarea { min-height:6.25rem; resize:vertical; }
   .landing-home { width: min(92vw, 42.5rem); padding-top: 1.125rem; }
   .landing-action-grid { grid-template-columns: 1fr; }
   .landing-hero h1 { font-size: clamp(2.5rem, 11vw, 3.625rem); }
-  .landing-history-card { margin-top: 2.5rem; }
   .landing-nav { gap:.4rem; }
   .landing-nav-btn { padding:.5rem .625rem; font-size:.75rem; white-space:nowrap; }
   .landing-history-actions {

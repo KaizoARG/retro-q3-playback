@@ -3932,7 +3932,7 @@ function adminPanelView() {
             <h2 style="font-size:1.75rem;margin:0">Feedback de la APP</h2>
             <p style="margin:.5rem 0 0;color:var(--muted)">Sugerencias recibidas desde el footer de la herramienta.</p>
           </div>
-          ${adminToolFeedback.length ? `<button id="adminDeleteAllFeedbackBtn" class="admin-delete-all-feedback-btn">Borrar todas</button>` : ""}
+          ${adminToolFeedback.length ? `<button id="adminDeleteAllFeedbackBtn" class="admin-delete-all-feedback-btn" aria-label="Eliminar todo el feedback" title="Eliminar todo el feedback">🗑️ Borrar todas</button>` : ""}
         </div>
         <div class="admin-feedback-list">
           ${adminToolFeedback.length ? adminToolFeedback.map(adminToolFeedbackRow).join("") : `<p style="opacity:.65;margin:1rem 0 0">Todavía no hay sugerencias recibidas.</p>`}
@@ -3952,7 +3952,7 @@ function adminToolFeedbackRow(item) {
         <div>${text}</div>
         ${date ? `<div class="admin-feedback-date">${escapeHtml(date)}</div>` : ""}
       </div>
-      <button type="button" class="admin-delete-feedback-btn" data-feedback-id="${id}">Borrar</button>
+      <button type="button" class="admin-delete-feedback-btn" data-feedback-id="${id}" aria-label="Eliminar feedback" title="Eliminar feedback">🗑️</button>
     </div>
   `;
 }
@@ -4091,7 +4091,6 @@ function bindAdminPanel() {
       });
       if (error) {
         btn.disabled = false;
-        btn.textContent = "Borrar";
         return alert("No se pudo borrar la sugerencia.\n\n" + error.message);
       }
       await renderAdmin();
@@ -4107,7 +4106,7 @@ function bindAdminPanel() {
       const { error } = await supabaseClient.rpc("delete_all_tool_feedback");
       if (error) {
         deleteAllFeedbackBtn.disabled = false;
-        deleteAllFeedbackBtn.textContent = "Borrar todas";
+        deleteAllFeedbackBtn.textContent = "🗑️ Borrar todas";
         return alert("No se pudo borrar el feedback.\n\n" + error.message);
       }
       await renderAdmin();

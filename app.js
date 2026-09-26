@@ -3488,7 +3488,7 @@ function landingShell(content) {
       ${landingView === "home" ? `
         <nav class="landing-nav">
           <button id="landingHistoryNavBtn" class="ghost landing-nav-btn">Ver retros</button>
-          <button id="landingNewRetroNavBtn" class="primary landing-nav-btn">+ Nueva retro</button>
+          <button id="landingNewRetroNavBtn" class="primary landing-nav-btn">Crear retro</button>
         </nav>
       ` : ""}
     `;
@@ -3553,7 +3553,7 @@ function landingRetroRow(retro) {
   const isJoinable = Boolean(retro.codigo) && !isFinished;
   const status = isFinished ? "Finalizada" : (isInProgress ? "En curso" : "En preparación");
   const joinButton = isJoinable ? `
-        <button class="primary landing-join-btn" data-retro-code="${escapeHtml(retro.codigo)}" style="padding:9px 13px">Unirse a la retrospectiva →</button>
+        <button class="primary landing-join-btn" data-retro-code="${escapeHtml(retro.codigo)}" style="padding:9px 13px">Unirse a la retro →</button>
   ` : "";
 
   return `
@@ -3563,7 +3563,7 @@ function landingRetroRow(retro) {
           <div style="font-size:18px;font-weight:700">${teams} · ${date}</div>
           <div style="opacity:.65;margin-top:5px">${status}</div>
         </div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <div class="landing-history-actions">
           <button class="landing-summary-btn${isFinished ? "" : " landing-disabled-action"}" data-retro-id="${retro.id}" aria-disabled="${isFinished ? "false" : "true"}" style="padding:9px 13px">Ver resumen</button>
           <button class="landing-feedback-btn${isFinished ? "" : " landing-disabled-action"}" data-retro-id="${retro.id}" aria-disabled="${isFinished ? "false" : "true"}" style="padding:9px 13px">Ver feedback</button>
           ${joinButton}

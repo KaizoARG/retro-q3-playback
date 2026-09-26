@@ -3638,7 +3638,7 @@ function landingShell(content) {
       ${landingView === "home" ? `
         <nav class="landing-nav">
           <button id="landingHistoryNavBtn" class="ghost landing-nav-btn">Ver retros</button>
-          <button id="landingNewRetroNavBtn" class="primary landing-nav-btn">Crear retro</button>
+          <button id="landingNewRetroNavBtn" class="primary landing-nav-btn">Nueva retro +</button>
         </nav>
       ` : ""}
     `;

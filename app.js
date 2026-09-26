@@ -3316,6 +3316,16 @@ const screens = [
       ? (state.guidingQuestions || []).filter(q => !q.topicKey || q.topicKey === topTopic.key)
       : (state.guidingQuestions || []);
 
+    const formatDuration = (start, end) => {
+      if (!start || !end) return "Tiempo total no disponible todavía";
+      const ms = Math.max(0, new Date(end).getTime() - new Date(start).getTime());
+      const totalSeconds = Math.floor(ms / 1000);
+      const hours = Math.floor(totalSeconds / 3600);
+      const minutes = Math.floor((totalSeconds % 3600) / 60);
+      const seconds = totalSeconds % 60;
+      return `${hours} h ${minutes} min ${seconds} s`;
+    };
+
     return `
       <section>
         <div class="eyebrow">Cierre</div>
@@ -3328,6 +3338,17 @@ const screens = [
           El facilitador puede ajustar cualquier elemento para que el resultado final
           represente lo que el equipo acuerda.
         </p>
+
+        <div class="card" style="margin-top:28px;display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap">
+          <div>
+            <div style="font-size:22px;font-weight:700">
+              Duración total: ${escapeHtml(formatDuration(state.retroStartedAt, state.retroFinishedAt))}
+            </div>
+            <div class="badge" style="margin-top:6px">
+              Tiempo transcurrido desde el inicio de la retro hasta su finalización.
+            </div>
+          </div>
+        </div>
 
         <div class="card" style="margin-top:18px">
           <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
@@ -3467,7 +3488,7 @@ function landingShell(content) {
       ${landingView === "home" ? `
         <nav class="landing-nav">
           <button id="landingHistoryNavBtn" class="ghost landing-nav-btn">Ver retros</button>
-          <button id="landingNewRetroNavBtn" class="primary landing-nav-btn">Crear retro</button>
+          <button id="landingNewRetroNavBtn" class="primary landing-nav-btn">+ Nueva retro</button>
         </nav>
       ` : ""}
     `;
@@ -3519,7 +3540,6 @@ function landingHome() {
             </div>
           `}
         </div>
-        <div id="landingDisabledNotice" class="landing-disabled-notice" role="status" aria-live="polite"></div>
       </div>
     </section>
   `;
@@ -3528,26 +3548,16 @@ function landingHome() {
 function landingRetroRow(retro) {
   const teams = escapeHtml(retro.equipos || retro.nombre || "Equipos no definidos");
   const date = escapeHtml(formatLandingDate(retro.fecha));
-  const isFinished = Boolean(retro.finalizada_en);
-  const isInProgress = Boolean(retro.iniciada || retro.iniciada_en) && !isFinished;
-  const isJoinable = Boolean(retro.codigo) && !isFinished;
-  const status = isFinished ? "Finalizada" : (isInProgress ? "En curso" : "En preparación");
-  const joinButton = isJoinable ? `
-        <button class="primary landing-join-btn" data-retro-code="${escapeHtml(retro.codigo)}" style="padding:9px 13px">Unirse a la retro →</button>
-  ` : "";
-
+  const status = retro.finalizada_en ? "Finalizada" : "En preparación";
   return `
-    <div style="padding:18px 0;border-bottom:1px solid rgba(255,255,255,.08)">
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:18px;flex-wrap:wrap">
-        <div style="min-width:260px;flex:1">
-          <div style="font-size:18px;font-weight:700">${teams} · ${date}</div>
-          <div style="opacity:.65;margin-top:5px">${status}</div>
-        </div>
-        <div class="landing-history-actions">
-          <button class="landing-summary-btn${isFinished ? "" : " landing-disabled-action"}" data-retro-id="${retro.id}" aria-disabled="${isFinished ? "false" : "true"}" style="padding:9px 13px">Ver resumen</button>
-          <button class="landing-feedback-btn${isFinished ? "" : " landing-disabled-action"}" data-retro-id="${retro.id}" aria-disabled="${isFinished ? "false" : "true"}" style="padding:9px 13px">Ver feedback</button>
-          ${joinButton}
-        </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:18px;padding:18px 0;border-bottom:1px solid rgba(255,255,255,.08);flex-wrap:wrap">
+      <div style="min-width:260px;flex:1">
+        <div style="font-size:18px;font-weight:700">${teams} · ${date}</div>
+        <div style="opacity:.65;margin-top:5px">${status}</div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="landing-summary-btn" data-retro-id="${retro.id}" style="padding:9px 13px">Ver resumen</button>
+        <button class="landing-feedback-btn" data-retro-id="${retro.id}" style="padding:9px 13px">Ver feedback</button>
       </div>
     </div>
   `;
@@ -3708,33 +3718,7 @@ function bindLanding() {
   const back = document.querySelector("#landingBackBtn");
   if (back) back.onclick = async () => { landingView = "home"; await loadLandingRetros(); renderLanding(); };
 
-  const showLandingDisabledNotice = () => {
-    const notice = document.querySelector("#landingDisabledNotice");
-    if (!notice) return;
-    notice.textContent = "Esta opción se va a habilitar una vez que finalice la retrospectiva.";
-    notice.classList.add("is-visible");
-  };
-
-  document.querySelectorAll(".landing-summary-btn.landing-disabled-action").forEach(btn => {
-    btn.onclick = showLandingDisabledNotice;
-  });
-
-  document.querySelectorAll(".landing-feedback-btn.landing-disabled-action").forEach(btn => {
-    btn.onclick = showLandingDisabledNotice;
-  });
-
-  document.querySelectorAll(".landing-join-btn").forEach(btn => {
-    btn.onclick = () => {
-      window.location.href = `?retro=${encodeURIComponent(btn.dataset.retroCode)}`;
-    };
-  });
-
-  /*
-   * Los botones de resumen y feedback quedan bloqueados durante una retro
-   * activa. La carga real del resumen/feedback sigue disponible únicamente
-   * una vez finalizada la retrospectiva.
-   */
-  document.querySelectorAll(".landing-summary-btn:not(.landing-disabled-action)").forEach(btn => {
+  document.querySelectorAll(".landing-summary-btn").forEach(btn => {
     btn.onclick = async () => {
       btn.disabled = true;
       const { data, error } = await supabaseClient.rpc("get_retro_summary", { p_retro_id: btn.dataset.retroId });
@@ -3759,34 +3743,13 @@ function bindLanding() {
     };
   });
 
-
-  document.querySelectorAll(".landing-feedback-btn:not(.landing-disabled-action)").forEach(btn => {
+  document.querySelectorAll(".landing-feedback-btn").forEach(btn => {
     btn.onclick = async () => {
       btn.disabled = true;
-
-      const { data: feedbackRows, error } = await supabaseClient
-        .from("retro_feedback")
-        .select("id, rating, observaciones, feedback_herramienta")
-        .eq("retro_id", btn.dataset.retroId)
-        .order("created_at", { ascending: true });
-
+      const { data, error } = await supabaseClient.rpc("get_retro_feedback_summary", { p_retro_id: btn.dataset.retroId });
       btn.disabled = false;
       if (error) return alert("No se pudo cargar el feedback.\n\n" + error.message);
-
-      const rows = feedbackRows || [];
-      const numericRatings = rows
-        .map(row => Number(row.rating))
-        .filter(Number.isFinite);
-      const averageRating = numericRatings.length
-        ? numericRatings.reduce((sum, rating) => sum + rating, 0) / numericRatings.length
-        : null;
-      const retro = landingRetros.find(item => String(item.id) === String(btn.dataset.retroId)) || {};
-
-      landingSelectedRetro = {
-        retro,
-        feedback: rows,
-        average_rating: averageRating
-      };
+      landingSelectedRetro = data;
       landingView = "feedback";
       renderLanding();
     };
@@ -3809,10 +3772,92 @@ function bindLanding() {
 
 
 // =====================================================
+// FEEDBACK DE LA HERRAMIENTA
+// =====================================================
+
+function closeToolFeedbackModal() {
+  const modal = document.querySelector("#toolFeedbackModal");
+  if (!modal) return;
+  modal.classList.remove("is-open");
+  modal.setAttribute("aria-hidden", "true");
+}
+
+function openToolFeedbackModal() {
+  const modal = document.querySelector("#toolFeedbackModal");
+  const textarea = document.querySelector("#toolFeedbackText");
+  const status = document.querySelector("#toolFeedbackStatus");
+  if (!modal) return;
+  if (textarea) textarea.value = "";
+  if (status) status.textContent = "";
+  modal.classList.add("is-open");
+  modal.setAttribute("aria-hidden", "false");
+  setTimeout(() => textarea?.focus(), 0);
+}
+
+function bindToolFeedback() {
+  const openBtn = document.querySelector("#toolFeedbackBtn");
+  const closeBtn = document.querySelector("#toolFeedbackClose");
+  const modal = document.querySelector("#toolFeedbackModal");
+  const submitBtn = document.querySelector("#toolFeedbackSubmit");
+  const textarea = document.querySelector("#toolFeedbackText");
+
+  if (openBtn) openBtn.onclick = openToolFeedbackModal;
+  if (closeBtn) closeBtn.onclick = closeToolFeedbackModal;
+
+  if (modal) {
+    modal.onclick = event => {
+      if (event.target === modal) closeToolFeedbackModal();
+    };
+  }
+
+  if (submitBtn) {
+    submitBtn.onclick = async () => {
+      const feedback = String(textarea?.value || "").trim();
+      const status = document.querySelector("#toolFeedbackStatus");
+
+      if (!feedback) {
+        if (status) status.textContent = "Escribí una sugerencia antes de enviar.";
+        textarea?.focus();
+        return;
+      }
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Enviando…";
+      if (status) status.textContent = "";
+
+      const { error } = await supabaseClient.rpc("submit_tool_feedback", {
+        p_feedback: feedback
+      });
+
+      if (error) {
+        console.error("Error guardando feedback de herramienta:", error);
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Enviar feedback →";
+        if (status) status.textContent = "No pudimos guardar tu feedback. Intentá nuevamente.";
+        return;
+      }
+
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Enviar feedback →";
+      if (status) status.textContent = "¡Gracias! Feedback enviado.";
+      if (textarea) textarea.value = "";
+
+      setTimeout(closeToolFeedbackModal, 900);
+    };
+  }
+
+  document.addEventListener("keydown", event => {
+    if (event.key === "Escape") closeToolFeedbackModal();
+  });
+}
+
+
+// =====================================================
 // ADMIN PRIVADO
 // =====================================================
 
 let adminRetros = [];
+let adminToolFeedback = [];
 
 function adminLoginView(message = "") {
   return `
@@ -3847,6 +3892,14 @@ function adminPanelView() {
       <div class="card" style="margin-top:32px">
         ${adminRetros.length ? adminRetros.map(adminRetroRow).join("") : `<p style="opacity:.65;margin:0">No hay retrospectivas registradas.</p>`}
       </div>
+
+      <div class="card admin-feedback-card">
+        <div class="eyebrow">FEEDBACK DE LA HERRAMIENTA</div>
+        <h2 style="margin-top:.5rem">Sugerencias recibidas</h2>
+        ${adminToolFeedback.length
+          ? adminToolFeedback.map(adminToolFeedbackRow).join("")
+          : `<p style="opacity:.65;margin:0">Todavía no hay sugerencias recibidas.</p>`}
+      </div>
     </section>
   `;
 }
@@ -3874,6 +3927,24 @@ function adminRetroRow(retro) {
   `;
 }
 
+function adminToolFeedbackRow(item) {
+  const date = item.created_at
+    ? new Date(item.created_at).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" })
+    : "Fecha no disponible";
+  return `
+    <div class="admin-feedback-item">
+      <div class="admin-feedback-meta">${escapeHtml(date)}</div>
+      <div class="admin-feedback-text">${escapeHtml(item.feedback || "")}</div>
+    </div>
+  `;
+}
+
+async function loadAdminToolFeedback() {
+  const { data, error } = await supabaseClient.rpc("get_admin_tool_feedback");
+  if (error) throw error;
+  adminToolFeedback = data || [];
+}
+
 async function loadAdminRetros() {
   const { data, error } = await supabaseClient.rpc("get_admin_retro_history");
   if (error) throw error;
@@ -3890,6 +3961,7 @@ async function renderAdmin() {
 
   try {
     await loadAdminRetros();
+    await loadAdminToolFeedback();
   } catch (error) {
     landingShell(adminLoginView("La cuenta autenticada no tiene permisos de administrador."));
     await supabaseClient.auth.signOut();
@@ -6455,6 +6527,8 @@ document
 // =====================================================
 
 async function initialize() {
+
+  bindToolFeedback();
 
   const isAdminRoute = urlParams.get("admin") === "1";
 

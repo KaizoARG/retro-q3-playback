@@ -82,3 +82,25 @@ textarea { min-height:100px; resize:vertical; }
   .topic-move-btn { width:32px; height:32px; }
   .topic-drag-handle { display:none; }
 }
+
+
+/* Estado de autosave: reserva espacio para evitar saltos de layout mientras se escribe. */
+.answer-autosave-row {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:12px;
+  min-height:34px;
+  flex-wrap:wrap;
+}
+.answer-autosave-status {
+  display:flex;
+  align-items:center;
+  min-height:20px;
+  font-size:13px;
+  opacity:.72;
+  line-height:20px;
+}
+@media(max-width:760px) {
+  .answer-autosave-row { align-items:flex-start; }
+}

@@ -231,6 +231,12 @@ textarea { min-height:6.25rem; resize:vertical; }
 .tool-feedback-actions button { padding:.6875rem 1rem; border-radius:.6875rem; cursor:pointer; }
 .tool-feedback-status { display:none; margin-top:1rem; color:var(--muted); line-height:1.45; }
 .tool-feedback-status.is-visible { display:block; }
+.tool-feedback-dialog.is-confirmation { text-align:center; }
+.tool-feedback-dialog.is-confirmation h2 { margin-top:1.25rem; margin-bottom:.625rem; }
+.tool-feedback-dialog.is-confirmation .tool-feedback-status {
+  margin-top:.75rem;
+  color:var(--muted);
+}
 
 /* Admin: feedback de la app */
 .admin-feedback-toolbar {

@@ -3474,23 +3474,47 @@ function closeToolFeedbackModal() {
   modal.setAttribute("aria-hidden", "true");
 }
 
-function openToolFeedbackModal() {
-  const modal = document.querySelector("#toolFeedbackModal");
+function resetToolFeedbackModal() {
   const input = document.querySelector("#toolFeedbackInput");
   const status = document.querySelector("#toolFeedbackStatus");
-  if (!modal) return;
-  modal.classList.add("is-open");
-  modal.setAttribute("aria-hidden", "false");
+  const counter = document.querySelector("#toolFeedbackCounter");
+  const submitBtn = document.querySelector("#toolFeedbackSubmitBtn");
+  const actions = document.querySelector(".tool-feedback-actions");
+  const meta = document.querySelector(".tool-feedback-meta");
+  const title = document.querySelector("#toolFeedbackTitle");
+  const lead = document.querySelector("#toolFeedbackModal .lead");
+
+  document.querySelector("#toolFeedbackDialog")?.classList.remove("is-confirmation");
+  if (title) title.textContent = "¿Qué mejorarías de la herramienta?";
+  if (lead) lead.textContent = "Contanos qué te gustaría cambiar, mejorar o sumar.";
+  if (input) {
+    input.value = "";
+    input.hidden = false;
+  }
+  if (counter) {
+    counter.textContent = "0 / 2000";
+    counter.hidden = false;
+  }
+  if (meta) meta.hidden = false;
+  if (actions) actions.hidden = false;
+  if (submitBtn) {
+    submitBtn.disabled = false;
+    submitBtn.textContent = "Enviar feedback →";
+  }
   if (status) {
     status.classList.remove("is-visible");
     status.textContent = "";
   }
-  if (input) {
-    input.value = "";
-    input.focus();
-    const counter = document.querySelector("#toolFeedbackCounter");
-    if (counter) counter.textContent = "0 / 2000";
-  }
+}
+
+function openToolFeedbackModal() {
+  const modal = document.querySelector("#toolFeedbackModal");
+  const input = document.querySelector("#toolFeedbackInput");
+  if (!modal) return;
+  resetToolFeedbackModal();
+  modal.classList.add("is-open");
+  modal.setAttribute("aria-hidden", "false");
+  if (input) input.focus();
 }
 
 function bindToolFeedback() {
@@ -3544,13 +3568,23 @@ function bindToolFeedback() {
 
       submitBtn.disabled = false;
       submitBtn.textContent = "Enviar feedback →";
+      const dialog = document.querySelector("#toolFeedbackDialog");
+      const actions = document.querySelector(".tool-feedback-actions");
+      const meta = document.querySelector(".tool-feedback-meta");
+      const title = document.querySelector("#toolFeedbackTitle");
+      const lead = document.querySelector("#toolFeedbackModal .lead");
+
+      if (input) input.hidden = true;
+      if (counter) counter.hidden = true;
+      if (meta) meta.hidden = true;
+      if (actions) actions.hidden = true;
+      if (dialog) dialog.classList.add("is-confirmation");
+      if (title) title.textContent = "¡Gracias!";
+      if (lead) lead.textContent = "Tu feedback fue enviado correctamente.";
       if (status) {
-        status.textContent = "¡Gracias! Tu feedback fue enviado.";
+        status.textContent = "Tu sugerencia fue recibida y ya forma parte del feedback de la APP.";
         status.classList.add("is-visible");
       }
-      if (input) input.value = "";
-      if (counter) counter.textContent = "0 / 2000";
-      setTimeout(closeToolFeedbackModal, 900);
     };
   }
 }
@@ -3926,15 +3960,15 @@ function adminPanelView() {
         ${adminRetros.length ? adminRetros.map(adminRetroRow).join("") : `<p style="opacity:.65;margin:0">No hay retrospectivas registradas.</p>`}
       </div>
 
-      <div class="card" style="margin-top:24px">
-        <div class="admin-feedback-toolbar">
+      <div class="card" id="adminToolFeedbackSection" style="margin-top:24px">
+        <div class="admin-feedback-toolbar" id="adminToolFeedbackToolbar">
           <div>
             <h2 style="font-size:1.75rem;margin:0">Feedback de la APP</h2>
             <p style="margin:.5rem 0 0;color:var(--muted)">Sugerencias recibidas desde el footer de la herramienta.</p>
           </div>
           ${adminToolFeedback.length ? `<button id="adminDeleteAllFeedbackBtn" class="admin-delete-all-feedback-btn" aria-label="Eliminar todo el feedback" title="Eliminar todo el feedback">🗑️ Borrar todas</button>` : ""}
         </div>
-        <div class="admin-feedback-list">
+        <div class="admin-feedback-list" id="adminToolFeedbackList">
           ${adminToolFeedback.length ? adminToolFeedback.map(adminToolFeedbackRow).join("") : `<p style="opacity:.65;margin:1rem 0 0">Todavía no hay sugerencias recibidas.</p>`}
         </div>
       </div>
@@ -3992,9 +4026,69 @@ async function loadAdminToolFeedback() {
   adminToolFeedback = data || [];
 }
 
+let adminToolFeedbackRefreshTimer = null;
+let adminToolFeedbackRefreshing = false;
+
+function adminToolFeedbackSignature(items = adminToolFeedback) {
+  return JSON.stringify((items || []).map(item => ({
+    id: item.id,
+    feedback: item.feedback,
+    created_at: item.created_at
+  })));
+}
+
+function renderAdminToolFeedbackSection() {
+  const section = document.querySelector("#adminToolFeedbackSection");
+  if (!section) return;
+
+  section.innerHTML = `
+    <div class="admin-feedback-toolbar" id="adminToolFeedbackToolbar">
+      <div>
+        <h2 style="font-size:1.75rem;margin:0">Feedback de la APP</h2>
+        <p style="margin:.5rem 0 0;color:var(--muted)">Sugerencias recibidas desde el footer de la herramienta.</p>
+      </div>
+      ${adminToolFeedback.length ? `<button id="adminDeleteAllFeedbackBtn" class="admin-delete-all-feedback-btn" aria-label="Eliminar todo el feedback" title="Eliminar todo el feedback">🗑️ Borrar todas</button>` : ""}
+    </div>
+    <div class="admin-feedback-list" id="adminToolFeedbackList">
+      ${adminToolFeedback.length ? adminToolFeedback.map(adminToolFeedbackRow).join("") : `<p style="opacity:.65;margin:1rem 0 0">Todavía no hay sugerencias recibidas.</p>`}
+    </div>
+  `;
+}
+
+async function refreshAdminToolFeedback() {
+  if (adminToolFeedbackRefreshing || !document.querySelector("#adminToolFeedbackSection")) return;
+  adminToolFeedbackRefreshing = true;
+  try {
+    const previousSignature = adminToolFeedbackSignature();
+    await loadAdminToolFeedback();
+    const nextSignature = adminToolFeedbackSignature();
+    if (previousSignature !== nextSignature) {
+      renderAdminToolFeedbackSection();
+      bindAdminToolFeedbackActions();
+    }
+  } catch (error) {
+    console.error("No se pudo actualizar el feedback de la APP:", error);
+  } finally {
+    adminToolFeedbackRefreshing = false;
+  }
+}
+
+function startAdminToolFeedbackAutoRefresh() {
+  if (adminToolFeedbackRefreshTimer) clearInterval(adminToolFeedbackRefreshTimer);
+  adminToolFeedbackRefreshTimer = setInterval(refreshAdminToolFeedback, 5000);
+}
+
+function stopAdminToolFeedbackAutoRefresh() {
+  if (adminToolFeedbackRefreshTimer) {
+    clearInterval(adminToolFeedbackRefreshTimer);
+    adminToolFeedbackRefreshTimer = null;
+  }
+}
+
 async function renderAdmin() {
   const { data: { session } } = await supabaseClient.auth.getSession();
   if (!session) {
+    stopAdminToolFeedbackAutoRefresh();
     landingShell(adminLoginView());
     bindAdminLogin();
     return;
@@ -4004,6 +4098,7 @@ async function renderAdmin() {
     await loadAdminRetros();
     await loadAdminToolFeedback();
   } catch (error) {
+    stopAdminToolFeedbackAutoRefresh();
     landingShell(adminLoginView("La cuenta autenticada no tiene permisos de administrador."));
     await supabaseClient.auth.signOut();
     bindAdminLogin();
@@ -4012,6 +4107,7 @@ async function renderAdmin() {
 
   landingShell(adminPanelView());
   bindAdminPanel();
+  startAdminToolFeedbackAutoRefresh();
 }
 
 function bindAdminLogin() {
@@ -4031,6 +4127,37 @@ function bindAdminLogin() {
     }
     await renderAdmin();
   };
+}
+
+function bindAdminToolFeedbackActions() {
+  document.querySelectorAll(".admin-delete-feedback-btn").forEach(btn => {
+    btn.onclick = async () => {
+      if (!confirm("¿Borrar esta sugerencia? Esta acción no se puede deshacer.")) return;
+      const { error } = await supabaseClient.rpc("delete_tool_feedback", {
+        p_feedback_id: btn.dataset.feedbackId
+      });
+      if (error) {
+        return alert("No se pudo borrar la sugerencia.\n\n" + error.message);
+      }
+      await renderAdmin();
+    };
+  });
+
+  const deleteAllFeedbackBtn = document.querySelector("#adminDeleteAllFeedbackBtn");
+  if (deleteAllFeedbackBtn) {
+    deleteAllFeedbackBtn.onclick = async () => {
+      if (!confirm("Vas a borrar todas las sugerencias de la APP. Esta acción no se puede deshacer.\n\n¿Querés continuar?")) return;
+      deleteAllFeedbackBtn.disabled = true;
+      deleteAllFeedbackBtn.textContent = "Borrando…";
+      const { error } = await supabaseClient.rpc("delete_all_tool_feedback");
+      if (error) {
+        deleteAllFeedbackBtn.disabled = false;
+        deleteAllFeedbackBtn.textContent = "🗑️ Borrar todas";
+        return alert("No se pudo borrar el feedback.\n\n" + error.message);
+      }
+      await renderAdmin();
+    };
+  }
 }
 
 function bindAdminPanel() {
@@ -4081,37 +4208,11 @@ function bindAdminPanel() {
     };
   });
 
-  document.querySelectorAll(".admin-delete-feedback-btn").forEach(btn => {
-    btn.onclick = async () => {
-      if (!confirm("¿Borrar esta sugerencia? Esta acción no se puede deshacer.")) return;
-      btn.disabled = true;
-      btn.textContent = "Borrando…";
-      const { error } = await supabaseClient.rpc("delete_tool_feedback", {
-        p_feedback_id: btn.dataset.feedbackId
-      });
-      if (error) {
-        btn.disabled = false;
-        return alert("No se pudo borrar la sugerencia.\n\n" + error.message);
-      }
-      await renderAdmin();
-    };
-  });
+  // feedback actions are bound from the helper above
 
-  const deleteAllFeedbackBtn = document.querySelector("#adminDeleteAllFeedbackBtn");
-  if (deleteAllFeedbackBtn) {
-    deleteAllFeedbackBtn.onclick = async () => {
-      if (!confirm("Vas a borrar todas las sugerencias de la APP. Esta acción no se puede deshacer.\n\n¿Querés continuar?")) return;
-      deleteAllFeedbackBtn.disabled = true;
-      deleteAllFeedbackBtn.textContent = "Borrando…";
-      const { error } = await supabaseClient.rpc("delete_all_tool_feedback");
-      if (error) {
-        deleteAllFeedbackBtn.disabled = false;
-        deleteAllFeedbackBtn.textContent = "🗑️ Borrar todas";
-        return alert("No se pudo borrar el feedback.\n\n" + error.message);
-      }
-      await renderAdmin();
-    };
-  }
+
+
+  bindAdminToolFeedbackActions();
 }
 
 async function initializeAdmin() {
